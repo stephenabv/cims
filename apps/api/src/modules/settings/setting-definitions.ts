@@ -36,6 +36,12 @@ export const SETTING_DEFINITIONS = {
   'security.sessionAbsoluteHours': { schema: z.number().int().min(1).max(72), default: 12 },
   'security.tempPasswordTtlHours': { schema: z.number().int().min(1).max(168), default: 24 },
   'security.passwordResetTtlMinutes': { schema: z.number().int().min(5).max(240), default: 30 },
+  /** Allow punching from browsers that are not registered kiosks (assumption A-7 / Q-4). */
+  'attendance.allowUnregisteredDevices': { schema: z.boolean(), default: false },
+  /** Repeat punches of the same type within this window are treated as duplicates. */
+  'attendance.duplicateWindowSeconds': { schema: z.number().int().min(10).max(900), default: 60 },
+  /** An open time-in older than this is abandoned (day stays INCOMPLETE) and a new time-in is allowed. */
+  'attendance.maxShiftHours': { schema: z.number().int().min(8).max(36), default: 18 },
 } as const;
 
 export type SettingKey = keyof typeof SETTING_DEFINITIONS;
