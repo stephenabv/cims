@@ -42,6 +42,22 @@ export class AccessService {
     }));
   }
 
+  /** Roles the actor may assign when provisioning or changing roles (see EmployeeAccessPolicy). */
+  async listAssignableRoles(actor: AuthContext) {
+    const roles = await this.prisma.role.findMany({
+      orderBy: { name: 'asc' },
+      include: { permissions: { select: { permissionCode: true } } },
+    });
+    const canManageAccess = actor.permissions.has('access.manage');
+    return roles
+      .filter(
+        (r) =>
+          canManageAccess ||
+          !(r.requiresMfa || r.permissions.some((p) => p.permissionCode === 'access.manage')),
+      )
+      .map((r) => ({ id: r.id, key: r.key, name: r.name, requiresMfa: r.requiresMfa }));
+  }
+
   async createRole(actor: AuthContext, input: CreateRoleInput, client: ClientInfo) {
     this.assertKnownPermissions(input.permissions);
     return this.prisma.$transaction(async (tx) => {

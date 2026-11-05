@@ -222,3 +222,16 @@ export class Client {
 }
 
 export const permissionSet = (codes: PermissionCode[]) => new Set(codes);
+
+/** Signs in a user whose role requires 2FA, enrolling TOTP on the way. */
+export async function loginPrivileged(c: Client, user: TestUser): Promise<void> {
+  const { authenticator } = await import('otplib');
+  const login = await c.login(user);
+  if (login.body.status !== 'MFA_ENROLLMENT_REQUIRED')
+    throw new Error(`Unexpected login status ${JSON.stringify(login.body)}`);
+  const start = await c.post('/auth/mfa/enroll');
+  const confirm = await c.post('/auth/mfa/enroll/confirm', {
+    code: authenticator.generate(start.body.secret),
+  });
+  if (confirm.status !== 200) throw new Error('MFA enrolment failed');
+}

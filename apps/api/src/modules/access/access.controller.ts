@@ -12,8 +12,13 @@ import {
 import type { Request } from 'express';
 import { ALL_PERMISSION_CODES, PERMISSIONS, type PermissionCode } from '@cims/shared';
 import { z } from 'zod';
-import { CurrentAuth, RequirePermissions } from '../../common/decorators/auth.decorators';
+import {
+  Authenticated,
+  CurrentAuth,
+  RequirePermissions,
+} from '../../common/decorators/auth.decorators';
 import { type AuthContext, clientInfo } from '../../common/http/request-context';
+import { ForbiddenError } from '../../common/errors/app-error';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
 import { AccessService } from './access.service';
 
@@ -55,6 +60,19 @@ export class AccessController {
   @RequirePermissions(PERMISSIONS.ACCESS_MANAGE)
   roles() {
     return this.access.listRoles();
+  }
+
+  @Get('roles/assignable')
+  @Authenticated()
+  assignable(@CurrentAuth() auth: AuthContext) {
+    if (
+      !auth.permissions.has(PERMISSIONS.EMPLOYEES_CREATE) &&
+      !auth.permissions.has(PERMISSIONS.EMPLOYEES_EDIT_EMPLOYMENT) &&
+      !auth.permissions.has(PERMISSIONS.ACCESS_MANAGE)
+    ) {
+      throw new ForbiddenError();
+    }
+    return this.access.listAssignableRoles(auth);
   }
 
   @Post('roles')

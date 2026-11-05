@@ -5,7 +5,11 @@ import { ChangePasswordPage } from '@/features/auth/ChangePasswordPage';
 import { ForgotPasswordPage } from '@/features/auth/ForgotPasswordPage';
 import { LoginPage } from '@/features/auth/LoginPage';
 import { ResetPasswordPage } from '@/features/auth/ResetPasswordPage';
+import { EmployeeDetailPage, MyProfilePage } from '@/features/employees/EmployeeDetailPage';
+import { EmployeesPage } from '@/features/employees/EmployeesPage';
+import { ProvisionEmployeePage } from '@/features/employees/ProvisionEmployeePage';
 import { HomePage } from '@/features/home/HomePage';
+import { OrgPage } from '@/features/org/OrgPage';
 import { ApiError } from '@/lib/api-client';
 import { AuthProvider } from '@/lib/auth';
 import { AppShell } from './layout/AppShell';
@@ -50,6 +54,11 @@ export function AppRoutes() {
       >
         <Route index element={<HomePage />} />
         <Route path="security" element={<SecurityPage />} />
+        <Route path="profile" element={<MyProfilePage />} />
+        <Route path="employees" element={<EmployeesPage />} />
+        <Route path="employees/new" element={<ProvisionEmployeePage />} />
+        <Route path="employees/:id" element={<EmployeeDetailPage />} />
+        <Route path="org" element={<OrgPage />} />
         <Route path="*" element={<NotFoundPage />} />
       </Route>
       <Route path="*" element={<NotFoundPage />} />
