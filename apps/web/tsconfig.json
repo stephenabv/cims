@@ -1,0 +1,16 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "jsx": "react-jsx",
+    "noEmit": true,
+    "declaration": false,
+    "composite": false,
+    "types": ["vite/client", "vite-plugin-pwa/client", "@testing-library/jest-dom/vitest"],
+    "paths": { "@cims/shared": ["../../packages/shared/src/index.ts"], "@/*": ["./src/*"] }
+  },
+  "include": ["src", "test", "vite.config.ts"]
+}

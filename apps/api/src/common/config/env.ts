@@ -35,7 +35,7 @@ export const envSchema = z
   .superRefine((env, ctx) => {
     if (env.NODE_ENV === 'production' && !env.COOKIE_SECURE) {
       ctx.addIssue({
-        code: z.ZodIssueCode.custom,
+        code: 'custom',
         path: ['COOKIE_SECURE'],
         message: 'must be true in production',
       });
