@@ -1,0 +1,19 @@
+# Local development services. Production deployment is described in docs/SYSTEM_ARCHITECTURE.md §11.
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: cims
+      POSTGRES_PASSWORD: cims_dev_password
+      POSTGRES_DB: cims
+    ports: ['5432:5432']
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U cims']
+      interval: 5s
+      retries: 10
+  mailpit:
+    image: axllent/mailpit:v1.21
+    ports: ['1025:1025', '8025:8025']
+volumes:
+  pgdata:

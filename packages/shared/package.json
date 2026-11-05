@@ -1,0 +1,22 @@
+{
+  "name": "@cims/shared",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Contracts shared by the CIMS API and web client: permission codes, enums, validation schemas.",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "vitest": "3.2.7"
+  }
+}
