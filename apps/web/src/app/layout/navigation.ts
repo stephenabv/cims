@@ -14,12 +14,20 @@ export interface NavItem {
 export const NAV_ITEMS: NavItem[] = [
   { to: '/app', label: 'Home', end: true },
   { to: '/app/profile', label: 'My profile' },
+  { to: '/app/attendance', label: 'My attendance', end: true },
+  {
+    to: '/app/attendance/monitor',
+    label: 'Attendance monitor',
+    requiresAny: [PERMISSIONS.ATTENDANCE_VIEW_ALL, PERMISSIONS.ATTENDANCE_VIEW_DEPARTMENT],
+  },
   {
     to: '/app/employees',
     label: 'Employees',
     requiresAny: [PERMISSIONS.EMPLOYEES_VIEW_ALL, PERMISSIONS.EMPLOYEES_VIEW_DEPARTMENT],
   },
   { to: '/app/org', label: 'Departments & positions', requires: [PERMISSIONS.ORG_MANAGE] },
+  { to: '/app/schedules', label: 'Schedules & holidays', requires: [PERMISSIONS.SCHEDULES_MANAGE] },
+  { to: '/app/kiosk-devices', label: 'Kiosk devices', requires: [PERMISSIONS.KIOSK_MANAGE] },
   { to: '/app/security', label: 'Sign-in & security' },
 ];
 

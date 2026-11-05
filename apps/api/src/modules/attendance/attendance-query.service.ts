@@ -34,6 +34,24 @@ export function statusWithoutPunches(
   return workDate < today ? 'ABSENT' : 'NOT_YET_IN';
 }
 
+/**
+ * Status shown for a day that has punches. A time-in still open on the current work date is a
+ * shift in progress, not an incomplete record, so it is shown by arrival (present or late) instead.
+ */
+export function statusWithPunches(
+  record: Pick<AttendanceDay, 'status' | 'hasOpenPunch' | 'lateMinutes'>,
+  workDate: string,
+  today: string,
+  scheduled: boolean,
+  isHoliday: boolean,
+): DailyStatus {
+  if (record.status !== 'INCOMPLETE' || !record.hasOpenPunch || workDate !== today)
+    return record.status;
+  if (isHoliday) return 'HOLIDAY_WORKED';
+  if (!scheduled) return 'REST_DAY_WORKED';
+  return record.lateMinutes > 0 ? 'LATE' : 'PRESENT';
+}
+
 export function summarise(days: AttendanceDayView[]): AttendanceSummary {
   const s: AttendanceSummary = {
     daysWorked: 0,
@@ -189,15 +207,10 @@ export class AttendanceQueryService {
     const rows: AttendanceMonitorRow[] = employees.map((e) => {
       const r = byEmployee.get(e.id);
       const schedule = schedules.get(e.id)!;
+      const scheduled = schedule.windowFor(q.date) !== null;
       const status: DailyStatus = r
-        ? r.status
-        : statusWithoutPunches(
-            q.date,
-            today,
-            fromDateColumn(e.dateHired),
-            schedule.windowFor(q.date) !== null,
-            isHoliday,
-          );
+        ? statusWithPunches(r, q.date, today, scheduled, isHoliday)
+        : statusWithoutPunches(q.date, today, fromDateColumn(e.dateHired), scheduled, isHoliday);
       return {
         employee: {
           id: e.id,
@@ -253,10 +266,11 @@ export class AttendanceQueryService {
       source: e.source,
       status: e.status,
     }));
+    const window = schedule.windowFor(date);
     if (record) {
       return {
         workDate: date,
-        status: record.status,
+        status: statusWithPunches(record, date, today, window !== null, isHoliday),
         firstIn: record.firstIn?.toISOString() ?? null,
         lastOut: record.lastOut?.toISOString() ?? null,
         workedMinutes: record.workedMinutes,
@@ -268,7 +282,6 @@ export class AttendanceQueryService {
         punches,
       };
     }
-    const window = schedule.windowFor(date);
     return {
       workDate: date,
       status: statusWithoutPunches(date, today, hired, window !== null, isHoliday),

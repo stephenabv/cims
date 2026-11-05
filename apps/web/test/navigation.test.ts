@@ -6,11 +6,17 @@ const labels = (granted: string[]) =>
 
 describe('navigation', () => {
   it('shows only self-service items to staff', () => {
-    expect(labels([])).toEqual(['Home', 'My profile', 'Sign-in & security']);
+    expect(labels([])).toEqual(['Home', 'My profile', 'My attendance', 'Sign-in & security']);
   });
   it('shows the employee directory with either view scope', () => {
     expect(labels(['employees.view.department'])).toContain('Employees');
     expect(labels(['employees.view.all'])).toContain('Employees');
+  });
+  it('shows attendance admin screens only with their permissions', () => {
+    expect(labels(['attendance.view.department'])).toContain('Attendance monitor');
+    expect(labels(['schedules.manage'])).toContain('Schedules & holidays');
+    expect(labels(['kiosk.manage'])).toContain('Kiosk devices');
+    expect(labels([])).not.toEqual(expect.arrayContaining(['Attendance monitor', 'Kiosk devices']));
   });
   it('shows organisation admin only with org.manage', () => {
     expect(labels(['org.manage'])).toContain('Departments & positions');
