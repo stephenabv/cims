@@ -87,7 +87,8 @@ export async function resetData(prisma: PrismaClient): Promise<void> {
   await prisma.$executeRawUnsafe(
     'TRUNCATE TABLE attendance_day, attendance_event, kiosk_device, holiday, session, password_reset_token, mfa_recovery_code, auth_event, audit_log, employee_change_history, user_account, employee, position, department, company_setting RESTART IDENTITY CASCADE',
   );
-  // Keep the migration-seeded default schedule; remove schedules created by tests.
+  // Keep seeded system roles and the default schedule; remove ones created by tests so suites stay order-independent.
+  await prisma.role.deleteMany({ where: { isSystem: false } });
   await prisma.workSchedule.deleteMany({ where: { isDefault: false } });
   await prisma.companySetting.create({
     data: { key: 'company.allowedEmailDomains', value: ['acme.test'] },
