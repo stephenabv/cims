@@ -12,6 +12,7 @@ import { PrismaModule } from './infrastructure/prisma/prisma.module';
 import { AccessModule } from './modules/access/access.module';
 import { AuditModule } from './modules/audit/audit.module';
 import { AuthModule } from './modules/auth/auth.module';
+import { EmployeesModule } from './modules/employees/employees.module';
 import { HealthController } from './modules/health/health.controller';
 import { SettingsModule } from './modules/settings/settings.module';
 
@@ -57,6 +58,7 @@ import { SettingsModule } from './modules/settings/settings.module';
     SettingsModule,
     AuthModule,
     AccessModule,
+    EmployeesModule,
   ],
   controllers: [HealthController],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],

@@ -186,6 +186,7 @@ Company timezone, allowed email domains, work schedules, grace periods, undertim
 - **[A-7] Kiosk model.** Attendance landing page runs on IT-registered kiosk devices (device token) and also in any browser on the company network; offline punching is allowed only on registered kiosk devices, because offline mode cannot verify PINs online. See architecture §Offline security.
 - **[A-8] Statutory deductions** (SSS, PhilHealth, Pag-IBIG, withholding tax) are modelled as **configurable deduction types** (fixed or percentage) rather than hard-coded government tables. See **[Q-2]**.
 - **[A-9] Payroll eligibility.** Paid leave adds regular hours to payroll (8h/day or scheduled hours) when the leave type is marked _paid_; unpaid leave does not.
+- **[A-11] Privileged role assignment.** Roles that require 2FA or grant access management (CEO, Executive, HR, IT by default) can only be assigned, changed, or have their holders suspended, by users with `access.manage` (IT). HR provisions and manages Staff-level accounts. Nobody can change their own role or account status. This prevents privilege escalation through the provisioning screen.
 - **[A-10] Supervisor approval of OT** follows the same supervisor relationship used for leave, falling back to HR.
 
 ## 9. Open questions (to confirm with the project owner)
