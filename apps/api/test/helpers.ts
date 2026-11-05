@@ -26,14 +26,21 @@ export class FakeMailer extends Mailer {
 
 export class MutableClock extends Clock {
   private offsetMs = 0;
+  private frozenAt: number | null = null;
   now(): Date {
-    return new Date(Date.now() + this.offsetMs);
+    return new Date((this.frozenAt ?? Date.now()) + this.offsetMs);
   }
   advance(ms: number): void {
     this.offsetMs += ms;
   }
+  /** Freezes "now" at the given instant so time-based assertions are exact. */
+  set(instant: Date | string): void {
+    this.frozenAt = new Date(instant).getTime();
+    this.offsetMs = 0;
+  }
   reset(): void {
     this.offsetMs = 0;
+    this.frozenAt = null;
   }
 }
 
@@ -78,8 +85,11 @@ export async function createTestApp(opts: { throttle?: boolean } = {}): Promise<
 export async function resetData(prisma: PrismaClient): Promise<void> {
   // Append-only triggers block DELETE on audit tables, so TRUNCATE (which bypasses row triggers) is used.
   await prisma.$executeRawUnsafe(
-    'TRUNCATE TABLE session, password_reset_token, mfa_recovery_code, auth_event, audit_log, employee_change_history, user_account, employee, position, department, company_setting RESTART IDENTITY CASCADE',
+    'TRUNCATE TABLE attendance_day, attendance_event, kiosk_device, holiday, session, password_reset_token, mfa_recovery_code, auth_event, audit_log, employee_change_history, user_account, employee, position, department, company_setting RESTART IDENTITY CASCADE',
   );
+  // Keep seeded system roles and the default schedule; remove ones created by tests so suites stay order-independent.
+  await prisma.role.deleteMany({ where: { isSystem: false } });
+  await prisma.workSchedule.deleteMany({ where: { isDefault: false } });
   await prisma.companySetting.create({
     data: { key: 'company.allowedEmailDomains', value: ['acme.test'] },
   });
@@ -212,6 +222,15 @@ export class Client {
     return res;
   }
 
+  /** Unauthenticated kiosk call: no cookies, optional device token. */
+  async kiosk(path: string, body?: object, token?: string): Promise<request.Response> {
+    let req = body
+      ? request(this.app.getHttpServer()).post(`/api/v1${path}`)
+      : request(this.app.getHttpServer()).get(`/api/v1${path}`);
+    if (token) req = req.set('x-kiosk-token', token);
+    return body ? req.send(body) : req;
+  }
+
   post(path: string, body?: object, opts?: { csrf?: boolean }): Promise<request.Response> {
     return this.send('post', path, body, opts);
   }
@@ -222,3 +241,18 @@ export class Client {
 }
 
 export const permissionSet = (codes: PermissionCode[]) => new Set(codes);
+
+/** Signs in a user whose role requires 2FA, enrolling TOTP on the way. */
+export async function loginPrivileged(c: Client, user: TestUser, clock?: Clock): Promise<void> {
+  const { authenticator: base } = await import('otplib');
+  // The server verifies codes against the injected clock, so generate them from the same instant.
+  const authenticator = clock ? base.clone({ epoch: clock.now().getTime() }) : base;
+  const login = await c.login(user);
+  if (login.body.status !== 'MFA_ENROLLMENT_REQUIRED')
+    throw new Error(`Unexpected login status ${JSON.stringify(login.body)}`);
+  const start = await c.post('/auth/mfa/enroll');
+  const confirm = await c.post('/auth/mfa/enroll/confirm', {
+    code: authenticator.generate(start.body.secret),
+  });
+  if (confirm.status !== 200) throw new Error('MFA enrolment failed');
+}

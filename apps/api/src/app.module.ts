@@ -11,7 +11,9 @@ import { MailModule } from './infrastructure/mail/mail.module';
 import { PrismaModule } from './infrastructure/prisma/prisma.module';
 import { AccessModule } from './modules/access/access.module';
 import { AuditModule } from './modules/audit/audit.module';
+import { AttendanceModule } from './modules/attendance/attendance.module';
 import { AuthModule } from './modules/auth/auth.module';
+import { EmployeesModule } from './modules/employees/employees.module';
 import { HealthController } from './modules/health/health.controller';
 import { SettingsModule } from './modules/settings/settings.module';
 
@@ -57,6 +59,8 @@ import { SettingsModule } from './modules/settings/settings.module';
     SettingsModule,
     AuthModule,
     AccessModule,
+    EmployeesModule,
+    AttendanceModule,
   ],
   controllers: [HealthController],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],

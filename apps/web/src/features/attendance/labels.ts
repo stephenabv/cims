@@ -1,0 +1,39 @@
+import type { DailyStatus } from '@cims/shared';
+
+type Tone = 'neutral' | 'success' | 'warning' | 'danger' | 'info';
+
+export const DAILY_STATUS: Record<DailyStatus, { label: string; tone: Tone }> = {
+  PRESENT: { label: 'Present', tone: 'success' },
+  LATE: { label: 'Late', tone: 'warning' },
+  INCOMPLETE: { label: 'Incomplete', tone: 'danger' },
+  ABSENT: { label: 'Absent', tone: 'danger' },
+  NOT_YET_IN: { label: 'Not yet in', tone: 'neutral' },
+  REST_DAY: { label: 'Rest day', tone: 'neutral' },
+  HOLIDAY: { label: 'Holiday', tone: 'info' },
+  REST_DAY_WORKED: { label: 'Worked rest day', tone: 'info' },
+  HOLIDAY_WORKED: { label: 'Worked holiday', tone: 'info' },
+  NOT_EMPLOYED: { label: 'Not employed', tone: 'neutral' },
+};
+
+/** Order of status chips on the monitoring board. */
+export const MONITOR_STATUSES = [
+  'PRESENT',
+  'LATE',
+  'INCOMPLETE',
+  'ABSENT',
+  'NOT_YET_IN',
+  'REST_DAY_WORKED',
+  'HOLIDAY_WORKED',
+  'REST_DAY',
+  'HOLIDAY',
+] as const satisfies readonly DailyStatus[];
+
+export const WEEKDAYS = [
+  { value: 1, short: 'Mon', label: 'Monday' },
+  { value: 2, short: 'Tue', label: 'Tuesday' },
+  { value: 3, short: 'Wed', label: 'Wednesday' },
+  { value: 4, short: 'Thu', label: 'Thursday' },
+  { value: 5, short: 'Fri', label: 'Friday' },
+  { value: 6, short: 'Sat', label: 'Saturday' },
+  { value: 7, short: 'Sun', label: 'Sunday' },
+] as const;

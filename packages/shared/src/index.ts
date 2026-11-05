@@ -2,3 +2,5 @@ export * from './permissions';
 export * from './enums';
 export * from './schemas/auth';
 export * from './schemas/common';
+export * from './schemas/employees';
+export * from './schemas/attendance';

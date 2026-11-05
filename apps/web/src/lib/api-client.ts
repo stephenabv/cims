@@ -50,13 +50,17 @@ export interface RequestOptions {
   method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
   body?: unknown;
   signal?: AbortSignal;
+  /** Extra request headers, e.g. the kiosk device token. */
+  headers?: Record<string, string>;
+  /** Set false for endpoints that do not use the session cookie (kiosk), skipping the CSRF handshake. */
+  csrf?: boolean;
 }
 
 async function send(path: string, opts: RequestOptions): Promise<Response> {
   const method = opts.method ?? 'GET';
-  const headers: Record<string, string> = { Accept: 'application/json' };
+  const headers: Record<string, string> = { ...opts.headers, Accept: 'application/json' };
   if (opts.body !== undefined) headers['Content-Type'] = 'application/json';
-  if (UNSAFE.has(method)) {
+  if (UNSAFE.has(method) && opts.csrf !== false) {
     await ensureCsrf();
     headers['X-CSRF-Token'] = readCookie(CSRF_COOKIE) ?? '';
   }

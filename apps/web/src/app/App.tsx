@@ -1,11 +1,23 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
+import { BrowserRouter, Route, Routes } from 'react-router-dom';
 import { SecurityPage } from '@/features/account/SecurityPage';
 import { ChangePasswordPage } from '@/features/auth/ChangePasswordPage';
 import { ForgotPasswordPage } from '@/features/auth/ForgotPasswordPage';
 import { LoginPage } from '@/features/auth/LoginPage';
 import { ResetPasswordPage } from '@/features/auth/ResetPasswordPage';
+import { AttendanceMonitorPage } from '@/features/attendance/AttendanceMonitorPage';
+import {
+  EmployeeAttendancePage,
+  MyAttendancePage,
+} from '@/features/attendance/AttendanceHistoryPage';
+import { KioskDevicesPage } from '@/features/attendance/KioskDevicesPage';
+import { SchedulesPage } from '@/features/attendance/SchedulesPage';
+import { EmployeeDetailPage, MyProfilePage } from '@/features/employees/EmployeeDetailPage';
+import { EmployeesPage } from '@/features/employees/EmployeesPage';
+import { ProvisionEmployeePage } from '@/features/employees/ProvisionEmployeePage';
 import { HomePage } from '@/features/home/HomePage';
+import { KioskPage } from '@/features/kiosk/KioskPage';
+import { OrgPage } from '@/features/org/OrgPage';
 import { ApiError } from '@/lib/api-client';
 import { AuthProvider } from '@/lib/auth';
 import { AppShell } from './layout/AppShell';
@@ -27,8 +39,8 @@ export function createQueryClient(): QueryClient {
 export function AppRoutes() {
   return (
     <Routes>
-      {/* The attendance kiosk becomes the default landing page in the attendance phase (§3.1). */}
-      <Route path="/" element={<Navigate to="/app" replace />} />
+      {/* The attendance kiosk is the default landing page (§3.1); staff sign in from there. */}
+      <Route path="/" element={<KioskPage />} />
       <Route path="/login" element={<LoginPage />} />
       <Route path="/forgot-password" element={<ForgotPasswordPage />} />
       <Route path="/reset-password" element={<ResetPasswordPage />} />
@@ -50,6 +62,16 @@ export function AppRoutes() {
       >
         <Route index element={<HomePage />} />
         <Route path="security" element={<SecurityPage />} />
+        <Route path="profile" element={<MyProfilePage />} />
+        <Route path="employees" element={<EmployeesPage />} />
+        <Route path="employees/new" element={<ProvisionEmployeePage />} />
+        <Route path="employees/:id" element={<EmployeeDetailPage />} />
+        <Route path="org" element={<OrgPage />} />
+        <Route path="attendance" element={<MyAttendancePage />} />
+        <Route path="attendance/monitor" element={<AttendanceMonitorPage />} />
+        <Route path="attendance/employees/:id" element={<EmployeeAttendancePage />} />
+        <Route path="schedules" element={<SchedulesPage />} />
+        <Route path="kiosk-devices" element={<KioskDevicesPage />} />
         <Route path="*" element={<NotFoundPage />} />
       </Route>
       <Route path="*" element={<NotFoundPage />} />
