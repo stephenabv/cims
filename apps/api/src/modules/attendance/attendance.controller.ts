@@ -30,6 +30,17 @@ import {
   resolveConflictSchema,
   ERROR_CODES,
   type HolidayInput,
+  type CancelCorrectionInput,
+  type CorrectionDecisionInput,
+  type CorrectionSettingsInput,
+  type MyCorrectionsQuery,
+  type SubmitCorrectionInput,
+  cancelCorrectionSchema,
+  correctionDecisionSchema,
+  correctionSettingsSchema,
+  myCorrectionsQuerySchema,
+  paginationSchema,
+  submitCorrectionSchema,
   type KioskConfirmInput,
   type KioskIdentifyInput,
   type KioskIdentifyResult,
@@ -63,6 +74,7 @@ import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
 import { Clock } from '../../infrastructure/clock/clock';
 import { SettingsService } from '../settings/settings.service';
 import { AttendanceAdjustmentService } from './attendance-adjustment.service';
+import { AttendanceCorrectionService } from './attendance-correction.service';
 import { AttendanceConflictService } from './attendance-conflict.service';
 import { AttendanceQueryService } from './attendance-query.service';
 import { KioskDeviceService } from './kiosk-device.service';
@@ -310,6 +322,89 @@ export class AttendanceController {
     @CurrentAuth() auth: AuthContext,
   ) {
     return this.query.monitor(auth, q);
+  }
+}
+
+/**
+ * Employee attendance correction requests (attendance spec §2). Filing and cancelling are for the
+ * signed-in employee's own records only; deciding is for the approver of the current step.
+ */
+@Controller('attendance/corrections')
+export class AttendanceCorrectionsController {
+  constructor(private readonly corrections: AttendanceCorrectionService) {}
+
+  @Post()
+  @Authenticated()
+  submit(
+    @Body(new ZodValidationPipe(submitCorrectionSchema)) body: SubmitCorrectionInput,
+    @CurrentAuth() auth: AuthContext,
+    @Req() req: Request,
+  ) {
+    return this.corrections.submit(auth, body, clientInfo(req));
+  }
+
+  @Get('mine')
+  @Authenticated()
+  mine(
+    @Query(new ZodValidationPipe(myCorrectionsQuerySchema)) q: MyCorrectionsQuery,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.corrections.mine(auth, q);
+  }
+
+  @Get('approvals')
+  @Authenticated()
+  approvals(
+    @Query(new ZodValidationPipe(paginationSchema)) q: { page: number; pageSize: number },
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.corrections.approvals(auth, q);
+  }
+
+  @Get('settings')
+  @RequirePermissions(PERMISSIONS.LEAVE_CONFIGURE)
+  settings() {
+    return this.corrections.approvalChainSetting();
+  }
+
+  @Put('settings')
+  @HttpCode(204)
+  @RequirePermissions(PERMISSIONS.LEAVE_CONFIGURE)
+  async updateSettings(
+    @Body(new ZodValidationPipe(correctionSettingsSchema)) body: CorrectionSettingsInput,
+    @CurrentAuth() auth: AuthContext,
+  ): Promise<void> {
+    await this.corrections.setApprovalChain(auth, body.approvalChainId);
+  }
+
+  @Get(':id')
+  @Authenticated()
+  get(@Param('id', uuid) id: string, @CurrentAuth() auth: AuthContext) {
+    return this.corrections.get(auth, id);
+  }
+
+  @Post(':id/decision')
+  @HttpCode(200)
+  @Authenticated()
+  decide(
+    @Param('id', uuid) id: string,
+    @Body(new ZodValidationPipe(correctionDecisionSchema)) body: CorrectionDecisionInput,
+    @CurrentAuth() auth: AuthContext,
+    @Req() req: Request,
+  ) {
+    return this.corrections.decide(auth, id, body, clientInfo(req));
+  }
+
+  @Post(':id/cancel')
+  @HttpCode(200)
+  @Authenticated()
+  cancel(
+    @Param('id', uuid) id: string,
+    @Body(new ZodValidationPipe(cancelCorrectionSchema)) body: CancelCorrectionInput,
+    @CurrentAuth() auth: AuthContext,
+    @Req() req: Request,
+  ) {
+    return this.corrections.cancel(auth, id, body, clientInfo(req));
   }
 }
 

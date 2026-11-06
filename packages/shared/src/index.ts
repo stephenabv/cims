@@ -5,6 +5,7 @@ export * from './schemas/auth';
 export * from './schemas/common';
 export * from './schemas/employees';
 export * from './schemas/attendance';
+export * from './schemas/corrections';
 export * from './schemas/leave';
 export * from './schemas/overtime';
 export * from './schemas/payroll';

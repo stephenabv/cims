@@ -10,6 +10,7 @@ describe('navigation', () => {
       'Home',
       'My profile',
       'My attendance',
+      'Attendance corrections',
       'My leave',
       'Sign-in & security',
     ]);

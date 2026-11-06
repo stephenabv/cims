@@ -55,3 +55,21 @@ export function timeToMinute(t: string): number | null {
   const match = /^(\d{2}):(\d{2})$/.exec(t);
   return match ? Number(match[1]) * 60 + Number(match[2]) : null;
 }
+
+/** Wall-clock parts of an instant in a zone: { date: 'YYYY-MM-DD', time: 'HH:MM' } (24-hour). */
+export function wallClock(iso: string, timeZone: string): { date: string; time: string } {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+  }).formatToParts(new Date(iso));
+  const get = (t: string) => parts.find((p) => p.type === t)?.value ?? '00';
+  return {
+    date: `${get('year')}-${get('month')}-${get('day')}`,
+    time: `${get('hour')}:${get('minute')}`,
+  };
+}

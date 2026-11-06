@@ -47,6 +47,11 @@ export const SETTING_DEFINITIONS = {
    * end) belongs to that shift, and a second press this soon after a time-out is not a new shift.
    */
   'attendance.shiftMarginMinutes': { schema: z.number().int().min(30).max(720), default: 240 },
+  /** Approval chain for employee attendance correction requests; 'default' = the default chain. */
+  'attendance.correctionApprovalChainId': {
+    schema: z.union([z.literal('default'), z.string().uuid()]),
+    default: 'default' as 'default' | (string & {}),
+  },
   /** Offline punches older than this are not applied automatically; HR reviews them. */
   'attendance.maxOfflineHours': { schema: z.number().int().min(1).max(720), default: 72 },
   /** Daily overtime shorter than this does not create an overtime record (assumption A-12). */

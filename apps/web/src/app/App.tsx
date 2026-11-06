@@ -1,3 +1,4 @@
+import { CorrectionsPage } from '@/features/corrections/CorrectionPages';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { BrowserRouter, Route, Routes } from 'react-router-dom';
 import { SecurityPage } from '@/features/account/SecurityPage';
@@ -78,6 +79,7 @@ export function AppRoutes() {
         <Route path="attendance/monitor" element={<AttendanceMonitorPage />} />
         <Route path="attendance/employees/:id" element={<EmployeeAttendancePage />} />
         <Route path="attendance/conflicts" element={<ConflictsPage />} />
+        <Route path="attendance/corrections" element={<CorrectionsPage />} />
         <Route path="schedules" element={<SchedulesPage />} />
         <Route path="kiosk-devices" element={<KioskDevicesPage />} />
         <Route path="leave" element={<MyLeavePage />} />

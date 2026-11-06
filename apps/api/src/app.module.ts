@@ -15,6 +15,7 @@ import { AttendanceModule } from './modules/attendance/attendance.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { EmployeesModule } from './modules/employees/employees.module';
 import { LeaveModule } from './modules/leave/leave.module';
+import { NotificationsModule } from './modules/notifications/notifications.module';
 import { HealthController } from './modules/health/health.controller';
 import { OvertimeModule } from './modules/overtime/overtime.module';
 import { PayrollModule } from './modules/payroll/payroll.module';
@@ -59,6 +60,7 @@ import { SettingsModule } from './modules/settings/settings.module';
     CryptoModule,
     MailModule,
     AuditModule,
+    NotificationsModule,
     SettingsModule,
     AuthModule,
     AccessModule,

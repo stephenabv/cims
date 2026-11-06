@@ -39,7 +39,7 @@ export function resolveApprovalSteps(
   const person = (kind: StepKind, id: string | null, missing: string): ResolvedStep => {
     if (!id) return { kind, status: 'SKIPPED', reason: missing };
     if (id === applicant.employeeId)
-      return { kind, status: 'SKIPPED', reason: 'Applicants do not approve their own leave' };
+      return { kind, status: 'SKIPPED', reason: 'Applicants do not approve their own requests' };
     if (seen.has(`e:${id}`))
       return { kind, status: 'SKIPPED', reason: 'Same approver as an earlier step' };
     seen.add(`e:${id}`);

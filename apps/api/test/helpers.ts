@@ -86,7 +86,7 @@ export async function createTestApp(opts: { throttle?: boolean } = {}): Promise<
 export async function resetData(prisma: PrismaClient): Promise<void> {
   // Append-only triggers block DELETE on audit tables, so TRUNCATE (which bypasses row triggers) is used.
   await prisma.$executeRawUnsafe(
-    'TRUNCATE TABLE employee_pay_item, compensation_profile, pay_item_type, undertime_policy, overtime_history, overtime_record, leave_request_day, leave_approval_step, leave_request, leave_balance, approval_chain_step, approval_chain, leave_type, attendance_conflict, sync_batch, attendance_day, attendance_event, kiosk_device, holiday, session, password_reset_token, mfa_recovery_code, auth_event, audit_log, employee_change_history, user_account, employee, position, department, company_setting RESTART IDENTITY CASCADE',
+    'TRUNCATE TABLE notification, attendance_correction_step, attendance_correction_request, employee_pay_item, compensation_profile, pay_item_type, undertime_policy, overtime_history, overtime_record, leave_request_day, leave_approval_step, leave_request, leave_balance, approval_chain_step, approval_chain, leave_type, attendance_conflict, sync_batch, attendance_day, attendance_event, kiosk_device, holiday, session, password_reset_token, mfa_recovery_code, auth_event, audit_log, employee_change_history, user_account, employee, position, department, company_setting RESTART IDENTITY CASCADE',
   );
   // Keep seeded system roles and the default schedule; remove ones created by tests so suites stay order-independent.
   await prisma.role.deleteMany({ where: { isSystem: false } });
