@@ -151,14 +151,20 @@ export function useResolveConflict() {
   return useMutation({
     mutationFn: ({ id, body }: { id: string; body: ResolveConflictInput }) =>
       api<void>(`/attendance/conflicts/${id}/resolve`, { method: 'POST', body }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['attendance'] }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['attendance'] });
+      void qc.invalidateQueries({ queryKey: ['overtime'] });
+    },
   });
 }
 
-/** HR corrections. Both refresh every attendance view, since days and summaries change. */
+/** HR corrections. Both refresh every attendance and overtime view, since days and summaries change. */
 export function useAttendanceAdjustments() {
   const qc = useQueryClient();
-  const onSuccess = () => qc.invalidateQueries({ queryKey: ['attendance'] });
+  const onSuccess = () => {
+    void qc.invalidateQueries({ queryKey: ['attendance'] });
+    void qc.invalidateQueries({ queryKey: ['overtime'] });
+  };
   return {
     addPunch: useMutation({
       mutationFn: ({ employeeId, body }: { employeeId: string; body: AddPunchInput }) =>

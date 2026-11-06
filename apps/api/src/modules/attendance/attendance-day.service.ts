@@ -3,15 +3,20 @@ import { PrismaService, type PrismaTx } from '../../infrastructure/prisma/prisma
 import { SettingsService } from '../settings/settings.service';
 import { computeAttendanceDay } from './domain/attendance-calculator';
 import { dateColumn } from './domain/work-date';
+import { OvertimeSyncService } from '../overtime/overtime-sync.service';
 import { ScheduleService } from './schedule.service';
 
-/** Keeps `attendance_day` consistent with the accepted punches of a work date. */
+/**
+ * Keeps `attendance_day` (and the day's overtime record) consistent with the accepted punches of a
+ * work date. Callers hold the employee row lock.
+ */
 @Injectable()
 export class AttendanceDayService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly schedules: ScheduleService,
     private readonly settings: SettingsService,
+    private readonly overtime: OvertimeSyncService,
   ) {}
 
   async recompute(tx: PrismaTx, employeeId: string, workDate: string): Promise<void> {
@@ -22,6 +27,7 @@ export class AttendanceDayService {
     });
     if (events.length === 0) {
       await tx.attendanceDay.deleteMany({ where: { employeeId, workDate: date } });
+      await this.overtime.sync(tx, employeeId, workDate, null);
       return;
     }
     const [timezone, schedule, holidays] = await Promise.all([
@@ -57,5 +63,7 @@ export class AttendanceDayService {
       create: { employeeId, workDate: date, ...data },
       update: data,
     });
+    const complete = r.status !== 'INCOMPLETE' && !r.hasOpenPunch;
+    await this.overtime.sync(tx, employeeId, workDate, complete ? r.overtimeMinutes : null);
   }
 }

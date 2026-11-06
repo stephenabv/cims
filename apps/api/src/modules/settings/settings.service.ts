@@ -43,36 +43,47 @@ export class SettingsService {
   }
 
   async set(key: string, value: unknown, actorUserId: string): Promise<void> {
-    if (!isSettingKey(key))
-      throw new ValidationError([{ path: 'key', message: `Unknown setting ${key}` }]);
-    const parsed = SETTING_DEFINITIONS[key].schema.safeParse(value);
-    if (!parsed.success) {
-      throw new ValidationError(
-        parsed.error.issues.map((i) => ({
-          path: ['value', ...i.path].join('.'),
-          message: i.message,
-        })),
-      );
+    await this.setMany({ [key]: value }, actorUserId);
+  }
+
+  /** Validates every value first, then writes all of them (each audited) in one transaction. */
+  async setMany(values: Record<string, unknown>, actorUserId: string): Promise<void> {
+    const parsed: [SettingKey, unknown][] = [];
+    for (const [key, value] of Object.entries(values)) {
+      if (!isSettingKey(key))
+        throw new ValidationError([{ path: 'key', message: `Unknown setting ${key}` }]);
+      const result = SETTING_DEFINITIONS[key].schema.safeParse(value);
+      if (!result.success) {
+        throw new ValidationError(
+          result.error.issues.map((i) => ({
+            path: ['value', ...i.path].join('.'),
+            message: i.message,
+          })),
+        );
+      }
+      parsed.push([key, result.data]);
     }
     await this.prisma.$transaction(async (tx) => {
-      const before = await this.get(key, tx);
-      const json = parsed.data as Prisma.InputJsonValue;
-      await tx.companySetting.upsert({
-        where: { key },
-        create: { key, value: json, updatedById: actorUserId },
-        update: { value: json, updatedById: actorUserId },
-      });
-      await this.audit.record(
-        {
-          actorUserId,
-          action: 'settings.update',
-          entityType: 'company_setting',
-          entityId: key,
-          before,
-          after: parsed.data,
-        },
-        tx,
-      );
+      for (const [key, value] of parsed) {
+        const before = await this.get(key, tx);
+        const json = value as Prisma.InputJsonValue;
+        await tx.companySetting.upsert({
+          where: { key },
+          create: { key, value: json, updatedById: actorUserId },
+          update: { value: json, updatedById: actorUserId },
+        });
+        await this.audit.record(
+          {
+            actorUserId,
+            action: 'settings.update',
+            entityType: 'company_setting',
+            entityId: key,
+            before,
+            after: value,
+          },
+          tx,
+        );
+      }
     });
   }
 }

@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { OvertimeSyncService } from '../overtime/overtime-sync.service';
 import { AttendanceDayService } from './attendance-day.service';
 import { AttendanceQueryService } from './attendance-query.service';
 import {
@@ -29,6 +30,7 @@ import { ScheduleService } from './schedule.service';
     AttendanceAdjustmentService,
     AttendanceDayService,
     AttendanceQueryService,
+    OvertimeSyncService,
   ],
   exports: [ScheduleService, AttendanceDayService, AttendanceQueryService],
 })

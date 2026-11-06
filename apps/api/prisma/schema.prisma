@@ -148,6 +148,7 @@ model Employee {
   leaveRequestDays             LeaveRequestDay[]
   leaveBalances                LeaveBalance[]
   approvalChainSteps           ApprovalChainStep[]
+  overtimeRecords              OvertimeRecord[]
   leaveApprovalSteps           LeaveApprovalStep[]
 
   @@index([departmentId])
@@ -712,4 +713,63 @@ model LeaveBalance {
 
   @@unique([employeeId, leaveTypeId, year])
   @@map("leave_balance")
+}
+
+// ───────────────────────────── Overtime (§3.4, §3.6) ─────────────────────────────
+
+enum OvertimeStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  /// Overtime vanished after a decision (attendance corrected); kept for its history.
+  VOIDED
+
+  @@map("overtime_status")
+}
+
+enum OvertimeAction {
+  APPROVE
+  REJECT
+  /// System: attendance changed after a decision, so the record needs a new one.
+  REOPEN
+  /// System: the day no longer has overtime.
+  VOID
+
+  @@map("overtime_action")
+}
+
+/// One per employee and work date with overtime at or above the company minimum. Kept in step
+/// with attendance_day by AttendanceDayService; only APPROVED minutes are payable (BR-13).
+model OvertimeRecord {
+  id              String            @id @default(uuid()) @db.Uuid
+  employeeId      String            @map("employee_id") @db.Uuid
+  employee        Employee          @relation(fields: [employeeId], references: [id], onDelete: Restrict)
+  workDate        DateTime          @map("work_date") @db.Date
+  actualMinutes   Int               @map("actual_minutes")
+  approvedMinutes Int?              @map("approved_minutes")
+  status          OvertimeStatus    @default(PENDING)
+  version         Int               @default(1)
+  createdAt       DateTime          @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt       DateTime          @updatedAt @map("updated_at") @db.Timestamptz(3)
+  history         OvertimeHistory[]
+
+  @@unique([employeeId, workDate])
+  @@index([workDate, status])
+  @@map("overtime_record")
+}
+
+/// Append-only trail of decisions and system changes on an overtime record (§3.6).
+model OvertimeHistory {
+  id        String         @id @default(uuid()) @db.Uuid
+  recordId  String         @map("record_id") @db.Uuid
+  record    OvertimeRecord @relation(fields: [recordId], references: [id], onDelete: Restrict)
+  action    OvertimeAction
+  minutes   Int?
+  note      String?        @db.VarChar(500)
+  /// User account that acted; null for system changes.
+  actedById String?        @map("acted_by_id") @db.Uuid
+  actedAt   DateTime       @default(now()) @map("acted_at") @db.Timestamptz(3)
+
+  @@index([recordId, actedAt])
+  @@map("overtime_history")
 }

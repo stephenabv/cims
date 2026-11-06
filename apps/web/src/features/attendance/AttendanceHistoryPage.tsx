@@ -1,4 +1,4 @@
-import { type AttendanceSummary, PERMISSIONS } from '@cims/shared';
+import { type AttendanceSummary, type OvertimeRecordView, PERMISSIONS } from '@cims/shared';
 import { Fragment, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { Alert } from '@/components/ui/Alert';
@@ -10,6 +10,8 @@ import { TextField } from '@/components/ui/TextField';
 import { errorMessage } from '@/lib/api-client';
 import { useAuth } from '@/lib/auth';
 import { addDays, formatMinutes, formatTime, formatWorkDate, todayIn } from '@/lib/datetime';
+import { useMyOvertime, useOvertimeList, useOvertimeWaiting } from '../overtime/api';
+import { OVERTIME_STATUS } from '../overtime/labels';
 import { useAttendanceRange } from './api';
 import { DayPunches } from './DayPunches';
 import { DAILY_STATUS } from './labels';
@@ -49,6 +51,9 @@ function AttendanceHistory({ employeeId }: { employeeId?: string }) {
   const canAdjust =
     !!employeeId && employeeId !== user?.employeeId && can(PERMISSIONS.ATTENDANCE_ADJUST);
   const [open, setOpen] = useState<string | null>(null);
+  const overtime = useOvertimeByDate(employeeId, from, to, !rangeError);
+  const waiting = useOvertimeWaiting();
+  const waitingCount = employeeId ? 0 : (waiting.data?.count ?? 0);
 
   const setRange = (next: { from?: string; to?: string }) => {
     const p = new URLSearchParams(params);
@@ -81,6 +86,15 @@ function AttendanceHistory({ employeeId }: { employeeId?: string }) {
         </p>
       )}
 
+      {waitingCount > 0 && (
+        <Alert tone="info">
+          {waitingCount} overtime {waitingCount === 1 ? 'record is' : 'records are'} waiting for
+          your approval.{' '}
+          <Link to="/app/overtime" className="font-medium underline">
+            Review now
+          </Link>
+        </Alert>
+      )}
       <div className="mb-4 grid max-w-md grid-cols-2 gap-3">
         <TextField
           label="From"
@@ -174,6 +188,7 @@ function AttendanceHistory({ employeeId }: { employeeId?: string }) {
                         </td>
                         <td className="hidden px-4 py-3 tabular-nums md:table-cell">
                           {formatMinutes(d.overtimeMinutes)}
+                          <OvertimeBadge record={overtime.get(d.workDate)} />
                         </td>
                         <td className="px-2 py-2 text-right">
                           <button
@@ -212,7 +227,8 @@ function AttendanceHistory({ employeeId }: { employeeId?: string }) {
             </div>
           )}
           <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">
-            Overtime shown here is time worked beyond schedule. Only approved overtime is paid.
+            Overtime shown here is time worked beyond schedule. Only approved overtime is paid;
+            overtime shorter than the company minimum is not sent for approval.
           </p>
         </>
       )}
@@ -245,5 +261,38 @@ function SummaryTiles({ summary }: { summary: AttendanceSummary }) {
         </div>
       ))}
     </dl>
+  );
+}
+
+/** Overtime records for the range, by work date: own records, or another employee's if in scope. */
+function useOvertimeByDate(
+  employeeId: string | undefined,
+  from: string,
+  to: string,
+  enabled: boolean,
+): Map<string, OvertimeRecordView> {
+  const mine = useMyOvertime(from, to, enabled && !employeeId);
+  const theirs = useOvertimeList(
+    { employeeId, from, to, page: 1, pageSize: 100 },
+    enabled && !!employeeId,
+  );
+  const rows = (employeeId ? theirs.data?.data : mine.data?.data) ?? [];
+  return new Map(rows.map((r) => [r.workDate, r]));
+}
+
+function OvertimeBadge({ record }: { record: OvertimeRecordView | undefined }) {
+  if (!record || record.status === 'VOIDED') return null;
+  const s = OVERTIME_STATUS[record.status];
+  const partial =
+    record.approvedMinutes !== null && record.approvedMinutes < record.actualMinutes
+      ? ` ${formatMinutes(record.approvedMinutes)}`
+      : '';
+  return (
+    <span className="ml-2">
+      <Badge tone={s.tone}>
+        {s.label}
+        {partial}
+      </Badge>
+    </span>
   );
 }

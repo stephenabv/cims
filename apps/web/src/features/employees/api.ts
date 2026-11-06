@@ -65,11 +65,12 @@ export const useEmployeeHistory = (id: string, enabled = true) =>
     enabled,
   });
 
-export const useDepartments = () =>
+export const useDepartments = (enabled = true) =>
   useQuery({
     queryKey: ['org', 'departments'],
     queryFn: () => api<Department[]>('/org/departments'),
     staleTime: 300_000,
+    enabled,
   });
 export const usePositions = () =>
   useQuery({

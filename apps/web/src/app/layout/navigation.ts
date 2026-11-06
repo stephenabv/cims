@@ -34,6 +34,21 @@ export const NAV_ITEMS: NavItem[] = [
   },
   { to: '/app/leave/settings', label: 'Leave settings', requires: [PERMISSIONS.LEAVE_CONFIGURE] },
   {
+    to: '/app/overtime',
+    label: 'Overtime',
+    end: true,
+    requiresAny: [
+      PERMISSIONS.OVERTIME_APPROVE,
+      PERMISSIONS.OVERTIME_VIEW_ALL,
+      PERMISSIONS.OVERTIME_VIEW_DEPARTMENT,
+    ],
+  },
+  {
+    to: '/app/overtime/summary',
+    label: 'Overtime & undertime',
+    requiresAny: [PERMISSIONS.OVERTIME_VIEW_ALL, PERMISSIONS.OVERTIME_VIEW_DEPARTMENT],
+  },
+  {
     to: '/app/employees',
     label: 'Employees',
     requiresAny: [PERMISSIONS.EMPLOYEES_VIEW_ALL, PERMISSIONS.EMPLOYEES_VIEW_DEPARTMENT],

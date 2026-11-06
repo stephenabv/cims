@@ -13,6 +13,7 @@ import {
 import { ConflictsPage } from '@/features/attendance/ConflictsPage';
 import { LeaveApprovalsPage, LeaveRequestsPage, MyLeavePage } from '@/features/leave/LeavePages';
 import { LeaveSettingsPage } from '@/features/leave/LeaveSettingsPage';
+import { OvertimeApprovalsPage, OvertimeSummaryPage } from '@/features/overtime/OvertimePages';
 import { KioskDevicesPage } from '@/features/attendance/KioskDevicesPage';
 import { SchedulesPage } from '@/features/attendance/SchedulesPage';
 import { EmployeeDetailPage, MyProfilePage } from '@/features/employees/EmployeeDetailPage';
@@ -80,6 +81,8 @@ export function AppRoutes() {
         <Route path="leave/approvals" element={<LeaveApprovalsPage />} />
         <Route path="leave/requests" element={<LeaveRequestsPage />} />
         <Route path="leave/settings" element={<LeaveSettingsPage />} />
+        <Route path="overtime" element={<OvertimeApprovalsPage />} />
+        <Route path="overtime/summary" element={<OvertimeSummaryPage />} />
         <Route path="*" element={<NotFoundPage />} />
       </Route>
       <Route path="*" element={<NotFoundPage />} />

@@ -5,3 +5,4 @@ export * from './schemas/common';
 export * from './schemas/employees';
 export * from './schemas/attendance';
 export * from './schemas/leave';
+export * from './schemas/overtime';
