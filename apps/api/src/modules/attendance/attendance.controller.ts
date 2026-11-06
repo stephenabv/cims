@@ -30,8 +30,13 @@ import {
   resolveConflictSchema,
   ERROR_CODES,
   type HolidayInput,
+  type KioskConfirmInput,
+  type KioskIdentifyInput,
+  type KioskIdentifyResult,
   type KioskPunchInput,
   type KioskPunchResult,
+  kioskConfirmSchema,
+  kioskIdentifySchema,
   type MyAttendanceQuery,
   PERMISSIONS,
   type RegisterKioskInput,
@@ -133,16 +138,8 @@ export class KioskController {
     };
   }
 
-  @Post('punch')
-  @HttpCode(201)
-  @Public()
-  @SkipCsrf()
-  // Busy kiosks serve many people from one IP; per-account PIN lockout is the main brute-force control.
-  @Throttle({ default: { limit: 60, ttl: 60_000 } })
-  async punch(
-    @Body(new ZodValidationPipe(kioskPunchSchema)) body: KioskPunchInput,
-    @Req() req: Request,
-  ): Promise<KioskPunchResult> {
+  /** Registered device, or null when unregistered browsers are allowed to take punches. */
+  private async punchingDevice(req: Request): Promise<{ id: string } | null> {
     const device = await this.devices.authenticate(req.header(KIOSK_TOKEN_HEADER));
     if (!device && !(await this.settings.get('attendance.allowUnregisteredDevices'))) {
       throw new UnauthenticatedError(
@@ -150,6 +147,49 @@ export class KioskController {
         'This device is not registered for attendance. Ask IT to register it.',
       );
     }
+    return device;
+  }
+
+  /** Unified button, step 1: verify the PIN and say whether the press will be a time in or out. */
+  @Post('identify')
+  @HttpCode(200)
+  @Public()
+  @SkipCsrf()
+  // Busy kiosks serve many people from one IP; per-account PIN lockout is the main brute-force control.
+  @Throttle({ default: { limit: 60, ttl: 60_000 } })
+  async identify(
+    @Body(new ZodValidationPipe(kioskIdentifySchema)) body: KioskIdentifyInput,
+    @Req() req: Request,
+  ): Promise<KioskIdentifyResult> {
+    const device = await this.punchingDevice(req);
+    return this.punches.identify(body, device?.id ?? null, clientInfo(req));
+  }
+
+  /** Unified button, step 2: record the offered action with the server's time. Idempotent per token. */
+  @Post('confirm')
+  @HttpCode(201)
+  @Public()
+  @SkipCsrf()
+  @Throttle({ default: { limit: 60, ttl: 60_000 } })
+  async confirm(
+    @Body(new ZodValidationPipe(kioskConfirmSchema)) body: KioskConfirmInput,
+    @Req() req: Request,
+  ): Promise<KioskPunchResult> {
+    const device = await this.punchingDevice(req);
+    return this.punches.confirm(body.confirmationToken, device?.id ?? null, clientInfo(req));
+  }
+
+  /** One-step punch kept for kiosks still running the previous version of the app. */
+  @Post('punch')
+  @HttpCode(201)
+  @Public()
+  @SkipCsrf()
+  @Throttle({ default: { limit: 60, ttl: 60_000 } })
+  async punch(
+    @Body(new ZodValidationPipe(kioskPunchSchema)) body: KioskPunchInput,
+    @Req() req: Request,
+  ): Promise<KioskPunchResult> {
+    const device = await this.punchingDevice(req);
     return this.punches.punch(body, device?.id ?? null, clientInfo(req));
   }
 }

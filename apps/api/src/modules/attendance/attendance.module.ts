@@ -14,6 +14,8 @@ import { AttendanceConflictService } from './attendance-conflict.service';
 import { KioskIdentityService } from './kiosk-identity.service';
 import { KioskSyncKeyService } from './kiosk-sync-key.service';
 import { KioskSyncService } from './kiosk-sync.service';
+import { KioskActionService } from './kiosk-action.service';
+import { KioskConfirmationService } from './kiosk-confirmation.service';
 import { PunchService } from './punch.service';
 import { ScheduleService } from './schedule.service';
 
@@ -23,6 +25,8 @@ import { ScheduleService } from './schedule.service';
     ScheduleService,
     KioskDeviceService,
     PunchService,
+    KioskActionService,
+    KioskConfirmationService,
     KioskIdentityService,
     KioskSyncKeyService,
     KioskSyncService,

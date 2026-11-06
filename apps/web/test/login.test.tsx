@@ -56,7 +56,9 @@ describe('sign-in flow', () => {
     const { calls } = mockFetch({ 'GET /auth/me': unauthenticated });
     renderAt('/login');
     await userEvent.click(await screen.findByRole('button', { name: 'Sign in' }));
-    expect(await screen.findByText('Account number must look like EMP-000123')).toBeInTheDocument();
+    expect(
+      await screen.findByText('Enter a valid employee number, e.g. 123 or EMP-000123'),
+    ).toBeInTheDocument();
     expect(calls.some((c) => c.path === '/auth/login')).toBe(false);
   });
 
@@ -71,7 +73,7 @@ describe('sign-in flow', () => {
       },
     });
     renderAt('/login');
-    await userEvent.type(await screen.findByLabelText('Account number'), 'emp-000123');
+    await userEvent.type(await screen.findByLabelText('Employee number'), 'emp-000123');
     await userEvent.type(screen.getByLabelText('Password'), 'Valid-Password-123');
     await userEvent.click(screen.getByRole('button', { name: 'Sign in' }));
 
@@ -93,7 +95,7 @@ describe('sign-in flow', () => {
       }),
     });
     renderAt('/login');
-    await userEvent.type(await screen.findByLabelText('Account number'), 'EMP-000123');
+    await userEvent.type(await screen.findByLabelText('Employee number'), 'EMP-000123');
     await userEvent.type(screen.getByLabelText('Password'), 'nope');
     await userEvent.click(screen.getByRole('button', { name: 'Sign in' }));
     expect(await screen.findByRole('alert')).toHaveTextContent(
@@ -108,7 +110,7 @@ describe('sign-in flow', () => {
       'POST /auth/login': () => ({ status: 200, body: { status: 'MFA_REQUIRED' } }),
     });
     renderAt('/login');
-    await userEvent.type(await screen.findByLabelText('Account number'), 'EMP-000123');
+    await userEvent.type(await screen.findByLabelText('Employee number'), 'EMP-000123');
     await userEvent.type(screen.getByLabelText('Password'), 'Valid-Password-123');
     await userEvent.click(screen.getByRole('button', { name: 'Sign in' }));
     expect(

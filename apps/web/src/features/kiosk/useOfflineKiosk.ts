@@ -27,7 +27,8 @@ export interface OfflineKiosk {
   reachable: boolean;
   /** True when this device can record punches without the server. */
   canQueue: boolean;
-  queue(punch: { accountNumber: string; pin: string; type: PunchType }): Promise<QueuedPunch>;
+  /** Queues a press; without `type` the server decides time in or out on sync. */
+  queue(punch: { accountNumber: string; pin: string; type?: PunchType }): Promise<QueuedPunch>;
   /** Sends queued punches now; network failures are swallowed (the queue is kept). */
   flush(): Promise<void>;
 }

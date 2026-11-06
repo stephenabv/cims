@@ -48,7 +48,7 @@ export function LoginPage() {
     );
   }
   return (
-    <AuthLayout title="Sign in" subtitle="Use your employee account number and password.">
+    <AuthLayout title="Sign in" subtitle="Use your employee number and password.">
       <PasswordStep
         onResult={(r) =>
           r.status === 'AUTHENTICATED'
@@ -79,8 +79,8 @@ function PasswordStep({ onResult }: { onResult: (r: LoginResult) => void }) {
     >
       {login.isError && <Alert tone="error">{errorMessage(login.error)}</Alert>}
       <TextField
-        label="Account number"
-        placeholder="EMP-000123"
+        label="Employee number"
+        placeholder="e.g. 123 or EMP-000123"
         autoComplete="username"
         autoCapitalize="characters"
         error={form.formState.errors.accountNumber?.message}

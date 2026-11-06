@@ -168,10 +168,13 @@ export async function createUser(
     mustChangePassword?: boolean;
     tempPasswordExpiresAt?: Date | null;
     requiresMfaOverride?: boolean;
+    /** Canonical employee number to use instead of a generated one. */
+    accountNumber?: string;
+    lastName?: string;
   } = {},
 ): Promise<TestUser> {
   seq += 1;
-  const accountNumber = `EMP-${String(900000 + seq).padStart(6, '0')}`;
+  const accountNumber = opts.accountNumber ?? `EMP-${String(900000 + seq).padStart(6, '0')}`;
   const password = 'Valid-Password-123';
   const pin = '482915';
   const email = `user${seq}@acme.test`;
@@ -180,7 +183,7 @@ export async function createUser(
     data: {
       accountNumber,
       firstName: 'Test',
-      lastName: `User${seq}`,
+      lastName: opts.lastName ?? `User${seq}`,
       companyEmail: email,
       dateHired: new Date('2026-01-05'),
     },

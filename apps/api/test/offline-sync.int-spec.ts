@@ -262,4 +262,32 @@ describe('Offline attendance sync (integration)', () => {
     expect(resolved.body.data[0].resolution.by).toMatch(/^Test User/);
     await expect(ctx.prisma.attendanceConflict.deleteMany()).rejects.toThrow();
   });
+
+  it('decides time in or out on sync for presses of the unified button (v2)', async () => {
+    ctx.clock.set(manila('2026-11-05', '19:00'));
+    const staff = await createUser(ctx.prisma);
+    const auto = (at: Date) => item(staff, 'TIME_IN', at, { v: 2, type: undefined });
+    const res = await sync([
+      auto(manila('2026-11-05', '07:55')),
+      // Pressed twice by accident: the second press is a duplicate, not a time out.
+      auto(new Date(manila('2026-11-05', '07:55').getTime() + 20_000)),
+      auto(manila('2026-11-05', '17:05')),
+      // A press after the shift is complete is kept for HR, never applied silently.
+      auto(manila('2026-11-05', '17:30')),
+    ]);
+    expect(statuses(res)).toEqual([
+      'APPLIED',
+      'DUPLICATE',
+      'APPLIED',
+      'CONFLICT:ALREADY_COMPLETED',
+    ]);
+    const events = await ctx.prisma.attendanceEvent.findMany({
+      where: { employeeId: staff.employeeId, status: 'ACCEPTED' },
+      orderBy: { occurredAt: 'asc' },
+    });
+    expect(events.map((e) => e.type)).toEqual(['TIME_IN', 'TIME_OUT']);
+    expect(
+      await ctx.prisma.attendanceDay.findFirstOrThrow({ where: { employeeId: staff.employeeId } }),
+    ).toMatchObject({ hasOpenPunch: false, workedMinutes: 490 });
+  });
 });

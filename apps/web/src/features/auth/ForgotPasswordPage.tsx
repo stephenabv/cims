@@ -45,8 +45,8 @@ export function ForgotPasswordPage() {
         >
           {request.isError && <Alert tone="error">{errorMessage(request.error)}</Alert>}
           <TextField
-            label="Account number"
-            placeholder="EMP-000123"
+            label="Employee number"
+            placeholder="e.g. 123 or EMP-000123"
             autoComplete="username"
             error={form.formState.errors.accountNumber?.message}
             {...form.register('accountNumber')}

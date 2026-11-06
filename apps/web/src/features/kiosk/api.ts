@@ -1,4 +1,4 @@
-import type { KioskPunchInput, KioskPunchResult } from '@cims/shared';
+import type { KioskIdentifyInput, KioskIdentifyResult, KioskPunchResult } from '@cims/shared';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { ApiError, NetworkError, api } from '@/lib/api-client';
 
@@ -49,15 +49,35 @@ export const useKioskStatus = (token: string | null) =>
       !(err instanceof NetworkError || (err instanceof ApiError && err.status < 500)) && count < 2,
   });
 
-export const usePunch = (token: string | null) =>
+/** Unified button, step 1: verify the PIN; the server says whether this will be a time in or out. */
+export const useIdentify = (token: string | null) =>
   useMutation({
-    mutationFn: (body: KioskPunchInput) =>
-      api<KioskPunchResult>('/kiosk/punch', {
+    mutationFn: (body: KioskIdentifyInput) =>
+      api<KioskIdentifyResult>('/kiosk/identify', {
         method: 'POST',
         body,
         csrf: false,
         headers: tokenHeader(token),
       }),
-    // Fail fast when offline so the punch can be queued instead of silently paused.
+    // Fail fast when offline so the press can be queued instead of silently paused.
     networkMode: 'always',
+  });
+
+/**
+ * Unified button, step 2: record the offered action. Safe to retry with the same token: the
+ * server records it once and answers retries with the same punch.
+ */
+export const useConfirmPunch = (token: string | null) =>
+  useMutation({
+    mutationFn: (confirmationToken: string) =>
+      api<KioskPunchResult>('/kiosk/confirm', {
+        method: 'POST',
+        body: { confirmationToken },
+        csrf: false,
+        headers: tokenHeader(token),
+      }),
+    networkMode: 'always',
+    // A dropped response is retried; the token makes the retry idempotent.
+    retry: (count, err) => err instanceof NetworkError && count < 2,
+    retryDelay: 800,
   });

@@ -1,13 +1,27 @@
 import { z } from 'zod';
+import { EMPLOYEE_NUMBER_MAX_INPUT, normalizeEmployeeNumber } from '../employee-number';
 
-/** Employee account numbers are system-assigned: "EMP-" followed by 6 digits (e.g. EMP-000123). */
-export const ACCOUNT_NUMBER_PATTERN = /^EMP-\d{6}$/;
+export { ACCOUNT_NUMBER_PATTERN } from '../employee-number';
 
+/** Shown for any malformed number; it never says whether a well-formed number exists. */
+export const INVALID_EMPLOYEE_NUMBER_MESSAGE =
+  'Enter a valid employee number, e.g. 123 or EMP-000123';
+
+/**
+ * Employee account numbers are system-assigned: "EMP-" followed by 6 digits (e.g. EMP-000123).
+ * Accepts the shortcuts described in `normalizeEmployeeNumber` and outputs the canonical form.
+ */
 export const accountNumberSchema = z
   .string()
-  .trim()
-  .toUpperCase()
-  .regex(ACCOUNT_NUMBER_PATTERN, 'Account number must look like EMP-000123');
+  .max(EMPLOYEE_NUMBER_MAX_INPUT, INVALID_EMPLOYEE_NUMBER_MESSAGE)
+  .transform((raw, ctx) => {
+    const canonical = normalizeEmployeeNumber(raw);
+    if (canonical === null) {
+      ctx.addIssue({ code: 'custom', message: INVALID_EMPLOYEE_NUMBER_MESSAGE });
+      return z.NEVER;
+    }
+    return canonical;
+  });
 
 export const PASSWORD_MIN_LENGTH = 12;
 export const PASSWORD_MAX_LENGTH = 128;
