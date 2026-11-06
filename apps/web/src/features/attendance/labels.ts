@@ -37,3 +37,12 @@ export const WEEKDAYS = [
   { value: 6, short: 'Sat', label: 'Saturday' },
   { value: 7, short: 'Sun', label: 'Sunday' },
 ] as const;
+
+/** Why an offline punch was held for review, in HR's words. */
+export const CONFLICT_REASON: Record<string, string> = {
+  ALREADY_TIMED_IN: 'Time-in while already timed in',
+  NOT_TIMED_IN: 'Time-out without a time-in',
+  SHIFT_TOO_LONG: 'Time-out too long after the time-in',
+  OUT_OF_SEQUENCE: 'Out of order with existing punches',
+  TOO_OLD: 'Synced too long after it was recorded',
+};

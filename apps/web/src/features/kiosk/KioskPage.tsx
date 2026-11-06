@@ -6,15 +6,22 @@ import { Alert } from '@/components/ui/Alert';
 import { Button } from '@/components/ui/Button';
 import { Spinner } from '@/components/ui/Spinner';
 import { TextField } from '@/components/ui/TextField';
-import { ApiError, errorMessage } from '@/lib/api-client';
+import { ApiError, NetworkError, errorMessage } from '@/lib/api-client';
 import { formatTime } from '@/lib/datetime';
-import { type KioskStatus, kioskStatusKey, useKioskStatus, usePunch } from './api';
+import {
+  type KioskStatus,
+  kioskStatusKey,
+  readCachedKioskStatus,
+  useKioskStatus,
+  usePunch,
+} from './api';
 import {
   clearDeviceToken,
   isValidDeviceToken,
   readDeviceToken,
   saveDeviceToken,
 } from './device-token';
+import { type OfflineKiosk, useOfflineKiosk } from './useOfflineKiosk';
 
 /** How long the confirmation stays on screen before the kiosk is ready for the next person. */
 const CONFIRMATION_MS = 6_000;
@@ -34,16 +41,22 @@ export function normaliseAccountNumber(raw: string): string {
 export function KioskPage() {
   const [token, setToken] = useState<string | null>(() => readDeviceToken());
   const status = useKioskStatus(token);
+  // A registered kiosk keeps working when the server is unreachable, using its last known settings.
+  const [cached] = useState(() => readCachedKioskStatus());
+  const offlineMode =
+    !status.data && status.isError && status.error instanceof NetworkError && !!token && !!cached;
+  const current: KioskStatus | undefined =
+    status.data ??
+    (offlineMode && cached ? { ...cached, serverTime: new Date().toISOString() } : undefined);
+  const offline = useOfflineKiosk(token, !!status.data?.device);
 
   return (
     <div className="flex min-h-full flex-col bg-gradient-to-b from-brand-900 to-slate-950 text-white">
       <header className="flex items-center justify-between gap-3 px-4 py-4 sm:px-8">
         <div className="min-w-0">
-          <p className="truncate text-lg font-semibold">{status.data?.companyName ?? 'CIMS'}</p>
+          <p className="truncate text-lg font-semibold">{current?.companyName ?? 'CIMS'}</p>
           <p className="truncate text-xs text-brand-100/80">
-            {status.data?.device
-              ? `Attendance kiosk · ${status.data.device.name}`
-              : 'Attendance kiosk'}
+            {current?.device ? `Attendance kiosk · ${current.device.name}` : 'Attendance kiosk'}
           </p>
         </div>
         <Link
@@ -55,12 +68,12 @@ export function KioskPage() {
       </header>
 
       <main className="flex flex-1 flex-col items-center justify-center gap-8 px-4 pb-10">
-        {status.isPending ? (
+        {status.isPending && !current ? (
           <Spinner className="size-8" />
-        ) : status.isError ? (
+        ) : !current ? (
           <div className="w-full max-w-md">
             <Alert tone="error" title="The attendance service is unavailable">
-              {errorMessage(status.error)} Retrying automatically.
+              {status.error ? errorMessage(status.error) : ''} Retrying automatically.
             </Alert>
             <div className="mt-4 flex justify-center">
               <Button variant="secondary" onClick={() => void status.refetch()}>
@@ -70,9 +83,15 @@ export function KioskPage() {
           </div>
         ) : (
           <>
-            <LiveClock status={status.data} />
-            {status.data.acceptsPunches ? (
-              <PunchPanel token={token} timezone={status.data.timezone} />
+            <LiveClock status={current} />
+            <SyncBanner offlineMode={offlineMode} offline={offline} />
+            {current.acceptsPunches ? (
+              <PunchPanel
+                token={token}
+                timezone={current.timezone}
+                offline={offline}
+                offlineMode={offlineMode}
+              />
             ) : (
               <DeviceSetup
                 hadToken={token !== null}
@@ -86,7 +105,7 @@ export function KioskPage() {
         )}
       </main>
 
-      {token && status.data?.device && (
+      {token && status.data?.device && offline.pending === 0 && (
         <footer className="px-4 pb-4 text-center">
           <ForgetDevice
             onForget={() => {
@@ -134,12 +153,29 @@ function LiveClock({ status }: { status: KioskStatus }) {
   );
 }
 
-function PunchPanel({ token, timezone }: { token: string | null; timezone: string }) {
+type PunchOutcome =
+  | { kind: 'online'; result: KioskPunchResult }
+  | { kind: 'offline'; type: PunchType; at: string };
+
+function PunchPanel({
+  token,
+  timezone,
+  offline,
+  offlineMode,
+}: {
+  token: string | null;
+  timezone: string;
+  offline: OfflineKiosk;
+  offlineMode: boolean;
+}) {
   const punch = usePunch(token);
+  const [queueing, setQueueing] = useState(false);
+  const [pressed, setPressed] = useState<PunchType | null>(null);
+  const [queueError, setQueueError] = useState<string>();
   const [accountNumber, setAccountNumber] = useState('');
   const [pin, setPin] = useState('');
   const [errors, setErrors] = useState<{ accountNumber?: string; pin?: string }>({});
-  const [result, setResult] = useState<KioskPunchResult | null>(null);
+  const [result, setResult] = useState<PunchOutcome | null>(null);
   const accountRef = useRef<HTMLInputElement>(null);
   const pinRef = useRef<HTMLInputElement>(null);
 
@@ -148,6 +184,7 @@ function PunchPanel({ token, timezone }: { token: string | null; timezone: strin
     setAccountNumber('');
     setPin('');
     setErrors({});
+    setQueueError(undefined);
     punch.reset();
     setTimeout(() => accountRef.current?.focus(), 0);
   }
@@ -159,7 +196,24 @@ function PunchPanel({ token, timezone }: { token: string | null; timezone: strin
     // reset only depends on stable setters
   }, [result]);
 
-  function submit(type: PunchType) {
+  async function recordOffline(input: { accountNumber: string; pin: string; type: PunchType }) {
+    setQueueing(true);
+    try {
+      const item = await offline.queue(input);
+      punch.reset();
+      setResult({ kind: 'offline', type: input.type, at: item.queuedAt });
+    } catch (err) {
+      setQueueError(
+        err instanceof Error ? err.message : 'Could not save the punch on this device.',
+      );
+      setPin('');
+    } finally {
+      setQueueing(false);
+    }
+  }
+
+  async function submit(type: PunchType) {
+    setPressed(type);
     const parsed = kioskPunchSchema.safeParse({
       accountNumber: normaliseAccountNumber(accountNumber),
       pin,
@@ -175,9 +229,14 @@ function PunchPanel({ token, timezone }: { token: string | null; timezone: strin
       return;
     }
     setErrors({});
+    setQueueError(undefined);
+    if (offlineMode) return recordOffline(parsed.data);
+    // Send anything queued first so the server sees punches in the order they happened.
+    if (offline.pending > 0) await offline.flush();
     punch.mutate(parsed.data, {
-      onSuccess: (r) => setResult(r),
-      onError: () => {
+      onSuccess: (r) => setResult({ kind: 'online', result: r }),
+      onError: (err) => {
+        if (err instanceof NetworkError && offline.canQueue) return void recordOffline(parsed.data);
         setPin('');
         pinRef.current?.focus();
       },
@@ -199,12 +258,26 @@ function PunchPanel({ token, timezone }: { token: string | null; timezone: strin
             strokeLinejoin="round"
           />
         </svg>
-        <p className="mt-4 text-2xl font-bold">
-          {result.type === 'TIME_IN' ? 'Time in recorded' : 'Time out recorded'}
-        </p>
-        <p className="mt-2 text-lg">
-          {result.displayName} · {formatTime(result.occurredAt, timezone)}
-        </p>
+        {result.kind === 'online' ? (
+          <>
+            <p className="mt-4 text-2xl font-bold">
+              {result.result.type === 'TIME_IN' ? 'Time in recorded' : 'Time out recorded'}
+            </p>
+            <p className="mt-2 text-lg">
+              {result.result.displayName} · {formatTime(result.result.occurredAt, timezone)}
+            </p>
+          </>
+        ) : (
+          <>
+            <p className="mt-4 text-2xl font-bold">
+              {result.type === 'TIME_IN' ? 'Time in saved offline' : 'Time out saved offline'}
+            </p>
+            <p className="mt-2 text-lg">{formatTime(result.at, timezone)} · pending sync</p>
+            <p className="mt-2 text-sm text-emerald-50">
+              It will be checked and sent when the connection returns. Your PIN is verified then.
+            </p>
+          </>
+        )}
         <Button variant="secondary" className="mt-6" onClick={reset}>
           Done
         </Button>
@@ -244,29 +317,58 @@ function PunchPanel({ token, timezone }: { token: string | null; timezone: strin
           onChange={(e) => setPin(e.target.value.replace(/\D/g, ''))}
           error={errors.pin}
         />
-        {punch.isError && <PunchError error={punch.error} />}
+        {queueError ? (
+          <Alert tone="error" title="Attendance not recorded">
+            {queueError}
+          </Alert>
+        ) : (
+          punch.isError &&
+          !(punch.error instanceof NetworkError && offline.canQueue) && (
+            <PunchError error={punch.error} />
+          )
+        )}
         <div className="grid grid-cols-2 gap-3 pt-2">
           <Button
             type="submit"
             className="min-h-14 text-base"
-            loading={punch.isPending && punch.variables?.type === 'TIME_IN'}
-            disabled={punch.isPending}
-            onClick={() => submit('TIME_IN')}
+            loading={(punch.isPending || queueing) && pressed === 'TIME_IN'}
+            disabled={punch.isPending || queueing}
+            onClick={() => void submit('TIME_IN')}
           >
             Time in
           </Button>
           <Button
             variant="secondary"
             className="min-h-14 text-base"
-            loading={punch.isPending && punch.variables?.type === 'TIME_OUT'}
-            disabled={punch.isPending}
-            onClick={() => submit('TIME_OUT')}
+            loading={(punch.isPending || queueing) && pressed === 'TIME_OUT'}
+            disabled={punch.isPending || queueing}
+            onClick={() => void submit('TIME_OUT')}
           >
             Time out
           </Button>
         </div>
       </div>
     </form>
+  );
+}
+
+function SyncBanner({ offlineMode, offline }: { offlineMode: boolean; offline: OfflineKiosk }) {
+  if (!offlineMode && offline.pending === 0) return null;
+  const waiting =
+    offline.pending === 0
+      ? ''
+      : ` ${offline.pending} ${offline.pending === 1 ? 'punch is' : 'punches are'} waiting to be sent.`;
+  return (
+    <div
+      role="status"
+      className="w-full max-w-md rounded-xl bg-amber-400/15 px-4 py-3 text-center text-sm text-amber-100 ring-1 ring-amber-300/30"
+    >
+      {offlineMode
+        ? `Offline: punches are saved on this device and sent when the connection returns.${waiting}`
+        : offline.syncing
+          ? `Sending saved punches…${waiting}`
+          : `Back online.${waiting} Retrying shortly.`}
+    </div>
   );
 }
 

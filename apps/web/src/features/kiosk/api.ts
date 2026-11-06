@@ -15,10 +15,31 @@ const tokenHeader = (token: string | null): Record<string, string> =>
 
 export const kioskStatusKey = (token: string | null) => ['kiosk', 'status', token] as const;
 
+const STATUS_CACHE = 'cims.kioskStatus';
+
+/** Last status seen online, so a registered kiosk can keep taking punches after a restart offline. */
+export function readCachedKioskStatus(): KioskStatus | null {
+  try {
+    const raw = localStorage.getItem(STATUS_CACHE);
+    return raw ? (JSON.parse(raw) as KioskStatus) : null;
+  } catch {
+    return null;
+  }
+}
+
 export const useKioskStatus = (token: string | null) =>
   useQuery({
     queryKey: kioskStatusKey(token),
-    queryFn: () => api<KioskStatus>('/kiosk/status', { headers: tokenHeader(token) }),
+    queryFn: async () => {
+      const status = await api<KioskStatus>('/kiosk/status', { headers: tokenHeader(token) });
+      try {
+        if (status.device) localStorage.setItem(STATUS_CACHE, JSON.stringify(status));
+        else localStorage.removeItem(STATUS_CACHE);
+      } catch {
+        /* storage unavailable */
+      }
+      return status;
+    },
     // Re-check periodically so a revoked device stops accepting punches and the clock stays synced.
     refetchInterval: 5 * 60_000,
   });
