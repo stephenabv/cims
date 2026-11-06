@@ -1,5 +1,5 @@
-import type { AttendanceSummary } from '@cims/shared';
-import { useState } from 'react';
+import { type AttendanceSummary, PERMISSIONS } from '@cims/shared';
+import { Fragment, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { Alert } from '@/components/ui/Alert';
 import { Badge } from '@/components/ui/Badge';
@@ -8,8 +8,10 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { Spinner } from '@/components/ui/Spinner';
 import { TextField } from '@/components/ui/TextField';
 import { errorMessage } from '@/lib/api-client';
+import { useAuth } from '@/lib/auth';
 import { addDays, formatMinutes, formatTime, formatWorkDate, todayIn } from '@/lib/datetime';
 import { useAttendanceRange } from './api';
+import { DayPunches } from './DayPunches';
 import { DAILY_STATUS } from './labels';
 
 /** Matches the API's 93-day range limit. */
@@ -42,6 +44,11 @@ function AttendanceHistory({ employeeId }: { employeeId?: string }) {
         ? 'Choose a range of 93 days or fewer.'
         : undefined;
   const range = useAttendanceRange(employeeId, from, to);
+  const { user, can } = useAuth();
+  // UX only: the API enforces the permission and refuses changes to one's own record.
+  const canAdjust =
+    !!employeeId && employeeId !== user?.employeeId && can(PERMISSIONS.ATTENDANCE_ADJUST);
+  const [open, setOpen] = useState<string | null>(null);
 
   const setRange = (next: { from?: string; to?: string }) => {
     const p = new URLSearchParams(params);
@@ -104,7 +111,7 @@ function AttendanceHistory({ employeeId }: { employeeId?: string }) {
           {range.data.days.length === 0 ? (
             <EmptyState title="No days in this range" description="Pick an earlier date range." />
           ) : (
-            <div className="overflow-x-auto rounded-xl bg-white shadow-sm ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-800">
+            <div className="relative overflow-x-auto rounded-xl bg-white shadow-sm ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-800">
               <table className="w-full text-left text-sm">
                 <caption className="sr-only">Daily attendance</caption>
                 <thead className="border-b border-slate-200 text-xs text-slate-500 uppercase dark:border-slate-800 dark:text-slate-400">
@@ -133,36 +140,72 @@ function AttendanceHistory({ employeeId }: { employeeId?: string }) {
                     <th scope="col" className="hidden px-4 py-3 font-medium md:table-cell">
                       Overtime
                     </th>
+                    <th scope="col" className="px-4 py-3 font-medium">
+                      <span className="sr-only">Punches</span>
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                   {range.data.days.map((d) => (
-                    <tr key={d.workDate}>
-                      <td className="px-4 py-3 whitespace-nowrap">{formatWorkDate(d.workDate)}</td>
-                      <td className="px-4 py-3">
-                        <Badge tone={DAILY_STATUS[d.status].tone}>
-                          {DAILY_STATUS[d.status].label}
-                        </Badge>
-                      </td>
-                      <td className="px-4 py-3 whitespace-nowrap tabular-nums">
-                        {formatTime(d.firstIn, tz)}
-                      </td>
-                      <td className="px-4 py-3 whitespace-nowrap tabular-nums">
-                        {formatTime(d.lastOut, tz)}
-                      </td>
-                      <td className="hidden px-4 py-3 tabular-nums sm:table-cell">
-                        {formatMinutes(d.workedMinutes)}
-                      </td>
-                      <td className="hidden px-4 py-3 tabular-nums md:table-cell">
-                        {formatMinutes(d.lateMinutes)}
-                      </td>
-                      <td className="hidden px-4 py-3 tabular-nums md:table-cell">
-                        {formatMinutes(d.undertimeMinutes)}
-                      </td>
-                      <td className="hidden px-4 py-3 tabular-nums md:table-cell">
-                        {formatMinutes(d.overtimeMinutes)}
-                      </td>
-                    </tr>
+                    <Fragment key={d.workDate}>
+                      <tr>
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          {formatWorkDate(d.workDate)}
+                        </td>
+                        <td className="px-4 py-3">
+                          <Badge tone={DAILY_STATUS[d.status].tone}>
+                            {DAILY_STATUS[d.status].label}
+                          </Badge>
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap tabular-nums">
+                          {formatTime(d.firstIn, tz)}
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap tabular-nums">
+                          {formatTime(d.lastOut, tz)}
+                        </td>
+                        <td className="hidden px-4 py-3 tabular-nums sm:table-cell">
+                          {formatMinutes(d.workedMinutes)}
+                        </td>
+                        <td className="hidden px-4 py-3 tabular-nums md:table-cell">
+                          {formatMinutes(d.lateMinutes)}
+                        </td>
+                        <td className="hidden px-4 py-3 tabular-nums md:table-cell">
+                          {formatMinutes(d.undertimeMinutes)}
+                        </td>
+                        <td className="hidden px-4 py-3 tabular-nums md:table-cell">
+                          {formatMinutes(d.overtimeMinutes)}
+                        </td>
+                        <td className="px-2 py-2 text-right">
+                          <button
+                            type="button"
+                            aria-expanded={open === d.workDate}
+                            aria-controls={`punches-${d.workDate}`}
+                            onClick={() => setOpen(open === d.workDate ? null : d.workDate)}
+                            className="min-h-9 rounded-lg px-2 text-xs font-medium whitespace-nowrap text-brand-700 hover:bg-slate-100 dark:text-brand-100 dark:hover:bg-slate-800"
+                          >
+                            {open === d.workDate ? 'Hide' : 'Punches'}
+                            <span className="sr-only"> for {formatWorkDate(d.workDate)}</span>
+                          </button>
+                        </td>
+                      </tr>
+                      {open === d.workDate && (
+                        <tr
+                          id={`punches-${d.workDate}`}
+                          className="bg-slate-50 dark:bg-slate-950/40"
+                        >
+                          <td colSpan={9} className="px-4 py-3">
+                            {/* On narrow screens the table scrolls sideways; keep the details pinned in view. */}
+                            <div className="sticky left-4 max-w-[calc(100vw-4rem)]">
+                              <DayPunches
+                                day={d}
+                                timezone={tz}
+                                employeeId={canAdjust ? employeeId : undefined}
+                              />
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </Fragment>
                   ))}
                 </tbody>
               </table>

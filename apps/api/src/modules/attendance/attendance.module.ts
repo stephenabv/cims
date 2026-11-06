@@ -8,6 +8,7 @@ import {
   SchedulesController,
 } from './attendance.controller';
 import { KioskDeviceService } from './kiosk-device.service';
+import { AttendanceAdjustmentService } from './attendance-adjustment.service';
 import { AttendanceConflictService } from './attendance-conflict.service';
 import { KioskIdentityService } from './kiosk-identity.service';
 import { KioskSyncKeyService } from './kiosk-sync-key.service';
@@ -25,6 +26,7 @@ import { ScheduleService } from './schedule.service';
     KioskSyncKeyService,
     KioskSyncService,
     AttendanceConflictService,
+    AttendanceAdjustmentService,
     AttendanceDayService,
     AttendanceQueryService,
   ],

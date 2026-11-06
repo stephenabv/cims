@@ -265,6 +265,7 @@ export class AttendanceQueryService {
       occurredAt: e.occurredAt.toISOString(),
       source: e.source,
       status: e.status,
+      note: e.status === 'VOIDED' ? e.voidReason : e.note,
     }));
     const window = schedule.windowFor(date);
     if (record) {

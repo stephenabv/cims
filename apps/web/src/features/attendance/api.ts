@@ -1,4 +1,6 @@
 import type {
+  AddPunchInput,
+  VoidPunchInput,
   AttendanceConflictView,
   AttendanceMonitorQuery,
   PaginatedResult,
@@ -151,4 +153,25 @@ export function useResolveConflict() {
       api<void>(`/attendance/conflicts/${id}/resolve`, { method: 'POST', body }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['attendance'] }),
   });
+}
+
+/** HR corrections. Both refresh every attendance view, since days and summaries change. */
+export function useAttendanceAdjustments() {
+  const qc = useQueryClient();
+  const onSuccess = () => qc.invalidateQueries({ queryKey: ['attendance'] });
+  return {
+    addPunch: useMutation({
+      mutationFn: ({ employeeId, body }: { employeeId: string; body: AddPunchInput }) =>
+        api<{ id: string; workDate: string }>(`/attendance/employees/${employeeId}/punches`, {
+          method: 'POST',
+          body,
+        }),
+      onSuccess,
+    }),
+    voidPunch: useMutation({
+      mutationFn: ({ id, body }: { id: string; body: VoidPunchInput }) =>
+        api<void>(`/attendance/punches/${id}/void`, { method: 'POST', body }),
+      onSuccess,
+    }),
+  };
 }
