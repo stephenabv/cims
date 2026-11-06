@@ -14,18 +14,20 @@ datasource db {
 // ───────────────────────────── Access control ─────────────────────────────
 
 model Role {
-  id          String           @id @default(uuid()) @db.Uuid
-  key         String           @unique @db.VarChar(50)
-  name        String           @db.VarChar(100)
-  description String?          @db.VarChar(500)
+  id                 String              @id @default(uuid()) @db.Uuid
+  key                String              @unique @db.VarChar(50)
+  name               String              @db.VarChar(100)
+  description        String?             @db.VarChar(500)
   /// System roles cannot be deleted or renamed (their permissions remain editable).
-  isSystem    Boolean          @default(false) @map("is_system")
+  isSystem           Boolean             @default(false) @map("is_system")
   /// Holders must enrol and use TOTP 2FA (spec §3.9, §5).
-  requiresMfa Boolean          @default(false) @map("requires_mfa")
-  createdAt   DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt   DateTime         @updatedAt @map("updated_at") @db.Timestamptz(3)
-  permissions RolePermission[]
-  users       UserAccount[]
+  requiresMfa        Boolean             @default(false) @map("requires_mfa")
+  createdAt          DateTime            @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt          DateTime            @updatedAt @map("updated_at") @db.Timestamptz(3)
+  permissions        RolePermission[]
+  users              UserAccount[]
+  approvalChainSteps ApprovalChainStep[]
+  leaveApprovalSteps LeaveApprovalStep[]
 
   @@map("role")
 }
@@ -142,6 +144,11 @@ model Employee {
   attendanceConflicts          AttendanceConflict[]
   headOfDepartments            Department[]             @relation("DepartmentHead")
   changeHistory                EmployeeChangeHistory[]
+  leaveRequests                LeaveRequest[]
+  leaveRequestDays             LeaveRequestDay[]
+  leaveBalances                LeaveBalance[]
+  approvalChainSteps           ApprovalChainStep[]
+  leaveApprovalSteps           LeaveApprovalStep[]
 
   @@index([departmentId])
   @@index([supervisorId])
@@ -535,4 +542,174 @@ model AttendanceConflict {
 
   @@index([status, createdAt])
   @@map("attendance_conflict")
+}
+
+// ─── Leave (spec §3.3) ─────────────────────────────────────────────────────────
+
+enum LeaveRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  /// Cancelled by HR (e.g. approved leave revoked before it starts) — assumption A-4.
+  CANCELLED
+  /// Pulled back by the employee before any approver acted — assumption A-4.
+  WITHDRAWN
+
+  @@map("leave_request_status")
+}
+
+enum ApprovalStepKind {
+  /// The employee's immediate supervisor.
+  SUPERVISOR
+  /// Head of the employee's department.
+  DEPARTMENT_HEAD
+  /// Any active user holding the role (and the leave.approve permission).
+  ROLE
+  /// A specific named employee.
+  EMPLOYEE
+
+  @@map("approval_step_kind")
+}
+
+enum LeaveStepStatus {
+  /// Later step; becomes PENDING when the previous one approves.
+  WAITING
+  PENDING
+  APPROVED
+  REJECTED
+  /// Could not be resolved (e.g. no supervisor) or would have the applicant approve themselves.
+  SKIPPED
+  /// Request ended (rejected, withdrawn, cancelled) before this step acted.
+  CANCELLED
+
+  @@map("leave_step_status")
+}
+
+model LeaveType {
+  id              String         @id @default(uuid()) @db.Uuid
+  code            String         @unique @db.VarChar(20)
+  name            String         @unique @db.VarChar(100)
+  /// Paid leave counts as paid hours in payroll (assumption A-9).
+  isPaid          Boolean        @default(true) @map("is_paid")
+  isActive        Boolean        @default(true) @map("is_active")
+  /// Null = the default approval chain.
+  approvalChainId String?        @map("approval_chain_id") @db.Uuid
+  approvalChain   ApprovalChain? @relation(fields: [approvalChainId], references: [id], onDelete: SetNull)
+  createdAt       DateTime       @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt       DateTime       @updatedAt @map("updated_at") @db.Timestamptz(3)
+  requests        LeaveRequest[]
+  balances        LeaveBalance[]
+
+  @@map("leave_type")
+}
+
+model ApprovalChain {
+  id         String              @id @default(uuid()) @db.Uuid
+  name       String              @unique @db.VarChar(100)
+  isDefault  Boolean             @default(false) @map("is_default")
+  createdAt  DateTime            @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt  DateTime            @updatedAt @map("updated_at") @db.Timestamptz(3)
+  steps      ApprovalChainStep[]
+  leaveTypes LeaveType[]
+
+  @@map("approval_chain")
+}
+
+model ApprovalChainStep {
+  id         String           @id @default(uuid()) @db.Uuid
+  chainId    String           @map("chain_id") @db.Uuid
+  chain      ApprovalChain    @relation(fields: [chainId], references: [id], onDelete: Cascade)
+  /// 1-based order.
+  position   Int
+  kind       ApprovalStepKind
+  roleId     String?          @map("role_id") @db.Uuid
+  role       Role?            @relation(fields: [roleId], references: [id], onDelete: Restrict)
+  employeeId String?          @map("employee_id") @db.Uuid
+  employee   Employee?        @relation(fields: [employeeId], references: [id], onDelete: Restrict)
+
+  @@unique([chainId, position])
+  @@map("approval_chain_step")
+}
+
+model LeaveRequest {
+  id          String              @id @default(uuid()) @db.Uuid
+  employeeId  String              @map("employee_id") @db.Uuid
+  employee    Employee            @relation(fields: [employeeId], references: [id], onDelete: Restrict)
+  leaveTypeId String              @map("leave_type_id") @db.Uuid
+  leaveType   LeaveType           @relation(fields: [leaveTypeId], references: [id], onDelete: Restrict)
+  startDate   DateTime            @map("start_date") @db.Date
+  endDate     DateTime            @map("end_date") @db.Date
+  /// Working days counted at submission (schedule and holidays then in force; assumption A-5).
+  days        Int
+  reason      String              @db.VarChar(1000)
+  status      LeaveRequestStatus  @default(PENDING)
+  /// Optimistic concurrency token: every state change increments it.
+  version     Int                 @default(1)
+  submittedAt DateTime            @default(now()) @map("submitted_at") @db.Timestamptz(3)
+  decidedAt   DateTime?           @map("decided_at") @db.Timestamptz(3)
+  /// User who withdrew or cancelled, and why.
+  endedById   String?             @map("ended_by_id") @db.Uuid
+  endReason   String?             @map("end_reason") @db.VarChar(500)
+  createdAt   DateTime            @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt   DateTime            @updatedAt @map("updated_at") @db.Timestamptz(3)
+  steps       LeaveApprovalStep[]
+  leaveDays   LeaveRequestDay[]
+
+  @@index([employeeId, startDate])
+  @@index([status])
+  @@map("leave_request")
+}
+
+/// One row per counted working day: drives balances per year, attendance (ON_LEAVE) and payroll.
+model LeaveRequestDay {
+  requestId  String       @map("request_id") @db.Uuid
+  request    LeaveRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  employeeId String       @map("employee_id") @db.Uuid
+  employee   Employee     @relation(fields: [employeeId], references: [id], onDelete: Restrict)
+  date       DateTime     @db.Date
+
+  @@id([requestId, date])
+  @@index([employeeId, date])
+  @@map("leave_request_day")
+}
+
+/// The chain resolved for one request at submission. Steps are never deleted.
+model LeaveApprovalStep {
+  id                 String           @id @default(uuid()) @db.Uuid
+  requestId          String           @map("request_id") @db.Uuid
+  request            LeaveRequest     @relation(fields: [requestId], references: [id], onDelete: Restrict)
+  position           Int
+  kind               ApprovalStepKind
+  /// Resolved approver for SUPERVISOR / DEPARTMENT_HEAD / EMPLOYEE steps.
+  approverEmployeeId String?          @map("approver_employee_id") @db.Uuid
+  approverEmployee   Employee?        @relation(fields: [approverEmployeeId], references: [id], onDelete: Restrict)
+  /// Role whose holders may act on a ROLE step.
+  approverRoleId     String?          @map("approver_role_id") @db.Uuid
+  approverRole       Role?            @relation(fields: [approverRoleId], references: [id], onDelete: Restrict)
+  status             LeaveStepStatus
+  actedById          String?          @map("acted_by_id") @db.Uuid
+  actedAt            DateTime?        @map("acted_at") @db.Timestamptz(3)
+  note               String?          @db.VarChar(500)
+
+  @@unique([requestId, position])
+  @@index([approverEmployeeId, status])
+  @@index([approverRoleId, status])
+  @@map("leave_approval_step")
+}
+
+/// Optional yearly allotment per employee and type (open question Q-1). No row = not limited.
+model LeaveBalance {
+  id           String    @id @default(uuid()) @db.Uuid
+  employeeId   String    @map("employee_id") @db.Uuid
+  employee     Employee  @relation(fields: [employeeId], references: [id], onDelete: Restrict)
+  leaveTypeId  String    @map("leave_type_id") @db.Uuid
+  leaveType    LeaveType @relation(fields: [leaveTypeId], references: [id], onDelete: Restrict)
+  year         Int
+  allottedDays Int       @map("allotted_days")
+  updatedById  String?   @map("updated_by_id") @db.Uuid
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt    DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@unique([employeeId, leaveTypeId, year])
+  @@map("leave_balance")
 }
