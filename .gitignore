@@ -10,3 +10,4 @@ apps/api/storage/
 playwright-report/
 test-results/
 dev-dist/
+.vercel/
