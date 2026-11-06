@@ -49,6 +49,16 @@ export const NAV_ITEMS: NavItem[] = [
     requiresAny: [PERMISSIONS.OVERTIME_VIEW_ALL, PERMISSIONS.OVERTIME_VIEW_DEPARTMENT],
   },
   {
+    to: '/app/payroll/employees',
+    label: 'Pay setup',
+    requires: [PERMISSIONS.COMPENSATION_VIEW],
+  },
+  {
+    to: '/app/payroll/settings',
+    label: 'Payroll settings',
+    requires: [PERMISSIONS.PAYROLL_CONFIGURE],
+  },
+  {
     to: '/app/employees',
     label: 'Employees',
     requiresAny: [PERMISSIONS.EMPLOYEES_VIEW_ALL, PERMISSIONS.EMPLOYEES_VIEW_DEPARTMENT],

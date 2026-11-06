@@ -17,6 +17,7 @@ import { EmployeesModule } from './modules/employees/employees.module';
 import { LeaveModule } from './modules/leave/leave.module';
 import { HealthController } from './modules/health/health.controller';
 import { OvertimeModule } from './modules/overtime/overtime.module';
+import { PayrollModule } from './modules/payroll/payroll.module';
 import { SettingsModule } from './modules/settings/settings.module';
 
 @Module({
@@ -64,6 +65,7 @@ import { SettingsModule } from './modules/settings/settings.module';
     EmployeesModule,
     LeaveModule,
     OvertimeModule,
+    PayrollModule,
     AttendanceModule,
   ],
   controllers: [HealthController],
