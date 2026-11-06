@@ -42,6 +42,8 @@ export const SETTING_DEFINITIONS = {
   'attendance.duplicateWindowSeconds': { schema: z.number().int().min(10).max(900), default: 60 },
   /** An open time-in older than this is abandoned (day stays INCOMPLETE) and a new time-in is allowed. */
   'attendance.maxShiftHours': { schema: z.number().int().min(8).max(36), default: 18 },
+  /** Offline punches older than this are not applied automatically; HR reviews them. */
+  'attendance.maxOfflineHours': { schema: z.number().int().min(1).max(720), default: 72 },
 } as const;
 
 export type SettingKey = keyof typeof SETTING_DEFINITIONS;
