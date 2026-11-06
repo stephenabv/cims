@@ -9,13 +9,12 @@ import {
 } from '../../common/errors/app-error';
 import type { ClientInfo } from '../../common/http/request-context';
 import { Clock } from '../../infrastructure/clock/clock';
-import { HashingService } from '../../infrastructure/crypto/hashing.service';
 import { PrismaService } from '../../infrastructure/prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
-import { LockoutPolicy } from '../auth/domain/lockout-policy';
 import { SettingsService } from '../settings/settings.service';
 import { AttendanceDayService } from './attendance-day.service';
 import { fromDateColumn, workDateOf } from './domain/work-date';
+import { KioskIdentityService } from './kiosk-identity.service';
 
 const INVALID = 'Invalid account number or PIN';
 
@@ -30,7 +29,7 @@ export type PunchRejection = 'ALREADY_TIMED_IN' | 'DUPLICATE' | 'NOT_TIMED_IN' |
 export class PunchService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly hashing: HashingService,
+    private readonly identity: KioskIdentityService,
     private readonly settings: SettingsService,
     private readonly audit: AuditService,
     private readonly days: AttendanceDayService,
@@ -42,105 +41,39 @@ export class PunchService {
     deviceId: string | null,
     client: ClientInfo,
   ): Promise<KioskPunchResult> {
-    const account = await this.prisma.userAccount.findFirst({
-      where: { employee: { accountNumber: input.accountNumber } },
-      include: { employee: { select: { id: true, firstName: true, lastName: true } } },
-    });
-    if (!account) {
-      await this.hashing.verifyAgainstDummy(input.pin);
-      await this.audit.authEvent({
-        type: 'PIN_VERIFY',
-        success: false,
-        accountNumber: input.accountNumber,
-        reason: 'unknown_account',
-        client,
-      });
+    const now = this.clock.now();
+    const verified = await this.identity.verify(input.accountNumber, input.pin, now, client);
+    if (!verified.ok) {
+      if (verified.reason === 'LOCKED')
+        throw new LockedError(
+          'Too many wrong PIN attempts. Try again later or ask HR to reset your PIN.',
+          verified.lockedUntil,
+        );
+      if (verified.reason === 'INACTIVE')
+        throw new AppError(
+          ERROR_CODES.ACCOUNT_INACTIVE,
+          'This account cannot record attendance. Please contact HR.',
+          HttpStatus.FORBIDDEN,
+        );
       throw new UnauthenticatedError(ERROR_CODES.INVALID_CREDENTIALS, INVALID);
     }
-
-    const now = this.clock.now();
+    const { identity } = verified;
     const s = await this.settings.getMany([
-      'security.pinMaxAttempts',
-      'security.pinLockoutMinutes',
       'company.timezone',
       'attendance.duplicateWindowSeconds',
       'attendance.maxShiftHours',
     ] as const);
-    const policy = new LockoutPolicy({
-      maxAttempts: s['security.pinMaxAttempts'],
-      lockoutMinutes: s['security.pinLockoutMinutes'],
-    });
-    const pinState = { failedCount: account.failedPinCount, lockedUntil: account.pinLockedUntil };
-    if (policy.isLocked(pinState, now)) {
-      await this.audit.authEvent({
-        type: 'PIN_VERIFY',
-        success: false,
-        userId: account.id,
-        accountNumber: input.accountNumber,
-        reason: 'locked',
-        client,
-      });
-      throw new LockedError(
-        'Too many wrong PIN attempts. Try again later or ask HR to reset your PIN.',
-        account.pinLockedUntil!,
-      );
-    }
-    if (!(await this.hashing.verifySecret(account.pinHash, input.pin))) {
-      const next = policy.registerFailure(pinState, now);
-      await this.prisma.userAccount.update({
-        where: { id: account.id },
-        data: { failedPinCount: next.failedCount, pinLockedUntil: next.lockedUntil },
-      });
-      await this.audit.authEvent({
-        type: 'PIN_VERIFY',
-        success: false,
-        userId: account.id,
-        accountNumber: input.accountNumber,
-        reason: 'bad_pin',
-        client,
-      });
-      if (next.justLocked)
-        await this.audit.authEvent({
-          type: 'ACCOUNT_LOCKED',
-          success: true,
-          userId: account.id,
-          reason: 'pin_failures',
-          client,
-        });
-      throw new UnauthenticatedError(ERROR_CODES.INVALID_CREDENTIALS, INVALID);
-    }
-    if (account.status !== 'ACTIVE') {
-      await this.audit.authEvent({
-        type: 'PIN_VERIFY',
-        success: false,
-        userId: account.id,
-        accountNumber: input.accountNumber,
-        reason: `status_${account.status.toLowerCase()}`,
-        client,
-      });
-      throw new AppError(
-        ERROR_CODES.ACCOUNT_INACTIVE,
-        'This account cannot record attendance. Please contact HR.',
-        HttpStatus.FORBIDDEN,
-      );
-    }
 
     const tz = s['company.timezone'];
     const dupMs = s['attendance.duplicateWindowSeconds'] * 1000;
     const maxShiftMs = s['attendance.maxShiftHours'] * 3_600_000;
-    const employeeId = account.employee.id;
+    const employeeId = identity.employeeId;
     const clockTime = (d: Date) => DateTime.fromJSDate(d, { zone: tz }).toFormat('h:mm a');
     const reject = (reason: PunchRejection, message: string) =>
       new ConflictError(message, { reason });
 
     const event = await this.prisma.$transaction(async (tx) => {
       await tx.$queryRaw`SELECT id FROM employee WHERE id = ${employeeId}::uuid FOR UPDATE`;
-      if (account.failedPinCount > 0 || account.pinLockedUntil) {
-        await tx.userAccount.update({
-          where: { id: account.id },
-          data: { failedPinCount: 0, pinLockedUntil: null },
-        });
-      }
       const last = await tx.attendanceEvent.findFirst({
         where: { employeeId, status: 'ACCEPTED' },
         orderBy: { occurredAt: 'desc' },
@@ -195,7 +128,7 @@ export class PunchService {
         {
           type: 'PIN_VERIFY',
           success: true,
-          userId: account.id,
+          userId: identity.userId,
           accountNumber: input.accountNumber,
           reason: input.type.toLowerCase(),
           client,
@@ -209,7 +142,7 @@ export class PunchService {
       type: event.created.type,
       occurredAt: event.created.occurredAt.toISOString(),
       workDate: event.workDate,
-      displayName: `${account.employee.firstName} ${account.employee.lastName.charAt(0)}.`,
+      displayName: `${identity.firstName} ${identity.lastName.charAt(0)}.`,
     };
   }
 }

@@ -146,3 +146,85 @@ export const holidaySchema = z.object({
   name: z.string().trim().min(2).max(150),
 });
 export type HolidayInput = z.infer<typeof holidaySchema>;
+
+// ─── Offline sync (§4) ───────────────────────────────────────────────────────
+
+/** What the kiosk encrypts with the server's public key for each offline punch. */
+export const offlinePunchPayloadSchema = z.object({
+  v: z.literal(1),
+  clientUuid: uuidSchema,
+  accountNumber: accountNumberSchema,
+  pin: z.string().regex(/^\d{6}$/),
+  type: z.enum(PUNCH_TYPES),
+  occurredAt: z.string().datetime({ offset: true }),
+});
+export type OfflinePunchPayload = z.infer<typeof offlinePunchPayloadSchema>;
+
+export const MAX_SYNC_ITEMS = 200;
+
+export const kioskSyncSchema = z.object({
+  items: z
+    .array(
+      z.object({
+        clientUuid: uuidSchema,
+        keyId: uuidSchema,
+        /** Base64 RSA-OAEP (SHA-256) ciphertext of an OfflinePunchPayload. */
+        ciphertext: z
+          .string()
+          .regex(/^[A-Za-z0-9+/]+={0,2}$/)
+          .max(1024),
+      }),
+    )
+    .min(1)
+    .max(MAX_SYNC_ITEMS)
+    .refine(
+      (items) => new Set(items.map((i) => i.clientUuid)).size === items.length,
+      'Duplicate clientUuid in batch',
+    ),
+});
+export type KioskSyncInput = z.infer<typeof kioskSyncSchema>;
+
+/**
+ * APPLIED: recorded. DUPLICATE: already recorded. CONFLICT: kept for HR review.
+ * REJECTED: cannot be recorded (bad PIN, inactive account, invalid data). DEFERRED: retry later.
+ * The kiosk removes every item except DEFERRED ones from its outbox.
+ */
+export const SYNC_ITEM_STATUSES = [
+  'APPLIED',
+  'DUPLICATE',
+  'CONFLICT',
+  'REJECTED',
+  'DEFERRED',
+] as const;
+export type SyncItemStatus = (typeof SYNC_ITEM_STATUSES)[number];
+
+export interface KioskSyncResult {
+  results: { clientUuid: string; status: SyncItemStatus; reason?: string }[];
+}
+
+export interface KioskSyncKey {
+  keyId: string;
+  /** Base64 DER SubjectPublicKeyInfo for WebCrypto `importKey('spki', …, { name: 'RSA-OAEP', hash: 'SHA-256' })`. */
+  publicKeySpki: string;
+}
+
+export const attendanceConflictQuerySchema = paginationSchema.extend({
+  status: z.enum(['OPEN', 'ACCEPTED', 'REJECTED']).default('OPEN'),
+});
+export type AttendanceConflictQuery = z.infer<typeof attendanceConflictQuerySchema>;
+
+export const resolveConflictSchema = z.object({
+  decision: z.enum(['ACCEPT', 'REJECT']),
+  note: z.string().trim().min(3, 'Explain the decision').max(500),
+});
+export type ResolveConflictInput = z.infer<typeof resolveConflictSchema>;
+
+export interface AttendanceConflictView {
+  id: string;
+  status: 'OPEN' | 'ACCEPTED' | 'REJECTED';
+  reason: string;
+  createdAt: string;
+  employee: { id: string; accountNumber: string; fullName: string };
+  punch: { type: PunchType; occurredAt: string; workDate: string; device: string | null };
+  resolution: { by: string | null; at: string; note: string } | null;
+}

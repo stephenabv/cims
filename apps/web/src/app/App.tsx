@@ -10,6 +10,7 @@ import {
   EmployeeAttendancePage,
   MyAttendancePage,
 } from '@/features/attendance/AttendanceHistoryPage';
+import { ConflictsPage } from '@/features/attendance/ConflictsPage';
 import { KioskDevicesPage } from '@/features/attendance/KioskDevicesPage';
 import { SchedulesPage } from '@/features/attendance/SchedulesPage';
 import { EmployeeDetailPage, MyProfilePage } from '@/features/employees/EmployeeDetailPage';
@@ -70,6 +71,7 @@ export function AppRoutes() {
         <Route path="attendance" element={<MyAttendancePage />} />
         <Route path="attendance/monitor" element={<AttendanceMonitorPage />} />
         <Route path="attendance/employees/:id" element={<EmployeeAttendancePage />} />
+        <Route path="attendance/conflicts" element={<ConflictsPage />} />
         <Route path="schedules" element={<SchedulesPage />} />
         <Route path="kiosk-devices" element={<KioskDevicesPage />} />
         <Route path="*" element={<NotFoundPage />} />

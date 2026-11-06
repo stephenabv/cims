@@ -15,7 +15,15 @@ import {
 import { Throttle } from '@nestjs/throttler';
 import type { Request } from 'express';
 import {
+  type AttendanceConflictQuery,
   type AttendanceMonitorQuery,
+  type KioskSyncInput,
+  type KioskSyncKey,
+  type KioskSyncResult,
+  type ResolveConflictInput,
+  attendanceConflictQuerySchema,
+  kioskSyncSchema,
+  resolveConflictSchema,
   ERROR_CODES,
   type HolidayInput,
   type KioskPunchInput,
@@ -45,8 +53,11 @@ import { type AuthContext, clientInfo } from '../../common/http/request-context'
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
 import { Clock } from '../../infrastructure/clock/clock';
 import { SettingsService } from '../settings/settings.service';
+import { AttendanceConflictService } from './attendance-conflict.service';
 import { AttendanceQueryService } from './attendance-query.service';
 import { KioskDeviceService } from './kiosk-device.service';
+import { KioskSyncKeyService } from './kiosk-sync-key.service';
+import { KioskSyncService } from './kiosk-sync.service';
 import { PunchService } from './punch.service';
 import { ScheduleService } from './schedule.service';
 
@@ -64,7 +75,40 @@ export class KioskController {
     private readonly punches: PunchService,
     private readonly settings: SettingsService,
     private readonly clock: Clock,
+    private readonly syncKeys: KioskSyncKeyService,
+    private readonly syncs: KioskSyncService,
   ) {}
+
+  /** Offline mode is only for registered devices: an unverified browser cannot queue punches. */
+  private async registeredDevice(req: Request): Promise<{ id: string; name: string }> {
+    const device = await this.devices.authenticate(req.header(KIOSK_TOKEN_HEADER));
+    if (!device)
+      throw new UnauthenticatedError(
+        ERROR_CODES.UNAUTHENTICATED,
+        'Offline attendance is only available on registered kiosk devices.',
+      );
+    return device;
+  }
+
+  @Get('sync-key')
+  @Public()
+  async syncKey(@Req() req: Request): Promise<KioskSyncKey> {
+    await this.registeredDevice(req);
+    return this.syncKeys.activeKey();
+  }
+
+  @Post('sync')
+  @HttpCode(200)
+  @Public()
+  @SkipCsrf()
+  @Throttle({ default: { limit: 30, ttl: 60_000 } })
+  async sync(
+    @Body(new ZodValidationPipe(kioskSyncSchema)) body: KioskSyncInput,
+    @Req() req: Request,
+  ): Promise<KioskSyncResult> {
+    const device = await this.registeredDevice(req);
+    return this.syncs.sync(device.id, body, clientInfo(req));
+  }
 
   @Get('status')
   @Public()
@@ -139,7 +183,30 @@ export class KioskDevicesController {
 
 @Controller('attendance')
 export class AttendanceController {
-  constructor(private readonly query: AttendanceQueryService) {}
+  constructor(
+    private readonly query: AttendanceQueryService,
+    private readonly conflicts: AttendanceConflictService,
+  ) {}
+
+  @Get('conflicts')
+  @RequirePermissions(PERMISSIONS.ATTENDANCE_RESOLVE_CONFLICTS)
+  listConflicts(
+    @Query(new ZodValidationPipe(attendanceConflictQuerySchema)) q: AttendanceConflictQuery,
+  ) {
+    return this.conflicts.list(q);
+  }
+
+  @Post('conflicts/:id/resolve')
+  @HttpCode(204)
+  @RequirePermissions(PERMISSIONS.ATTENDANCE_RESOLVE_CONFLICTS)
+  async resolveConflict(
+    @Param('id', uuid) id: string,
+    @Body(new ZodValidationPipe(resolveConflictSchema)) body: ResolveConflictInput,
+    @CurrentAuth() auth: AuthContext,
+    @Req() req: Request,
+  ): Promise<void> {
+    await this.conflicts.resolve(auth, id, body, clientInfo(req));
+  }
 
   @Get('me')
   @Authenticated()

@@ -1,5 +1,8 @@
 import type {
+  AttendanceConflictView,
   AttendanceMonitorQuery,
+  PaginatedResult,
+  ResolveConflictInput,
   AttendanceMonitorResult,
   AttendanceRangeResult,
   HolidayInput,
@@ -125,4 +128,27 @@ export function useKioskDeviceMutations() {
       onSuccess,
     }),
   };
+}
+
+export const useAttendanceConflicts = (
+  status: 'OPEN' | 'ACCEPTED' | 'REJECTED',
+  page: number,
+  pageSize: number,
+) =>
+  useQuery({
+    queryKey: ['attendance', 'conflicts', status, page, pageSize],
+    queryFn: () =>
+      api<PaginatedResult<AttendanceConflictView>>(
+        `/attendance/conflicts?${qs({ status, page, pageSize })}`,
+      ),
+    placeholderData: keepPreviousData,
+  });
+
+export function useResolveConflict() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, body }: { id: string; body: ResolveConflictInput }) =>
+      api<void>(`/attendance/conflicts/${id}/resolve`, { method: 'POST', body }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['attendance'] }),
+  });
 }

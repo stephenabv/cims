@@ -16,6 +16,7 @@ describe('navigation', () => {
     expect(labels(['attendance.view.department'])).toContain('Attendance monitor');
     expect(labels(['schedules.manage'])).toContain('Schedules & holidays');
     expect(labels(['kiosk.manage'])).toContain('Kiosk devices');
+    expect(labels(['attendance.resolve_conflicts'])).toContain('Sync conflicts');
     expect(labels([])).not.toEqual(expect.arrayContaining(['Attendance monitor', 'Kiosk devices']));
   });
   it('shows organisation admin only with org.manage', () => {
