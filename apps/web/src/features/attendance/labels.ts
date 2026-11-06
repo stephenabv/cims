@@ -46,3 +46,9 @@ export const CONFLICT_REASON: Record<string, string> = {
   OUT_OF_SEQUENCE: 'Out of order with existing punches',
   TOO_OLD: 'Synced too long after it was recorded',
 };
+
+export const PUNCH_SOURCE: Record<string, string> = {
+  KIOSK_ONLINE: 'Kiosk',
+  KIOSK_OFFLINE: 'Kiosk (offline)',
+  ADJUSTMENT: 'Added by HR',
+};

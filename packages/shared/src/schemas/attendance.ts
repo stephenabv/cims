@@ -81,7 +81,15 @@ export interface AttendanceDayView {
   undertimeMinutes: number;
   overtimeMinutes: number;
   scheduledMinutes: number;
-  punches: { id: string; type: PunchType; occurredAt: string; source: string; status: string }[];
+  punches: {
+    id: string;
+    type: PunchType;
+    occurredAt: string;
+    source: string;
+    status: string;
+    /** Why HR added this punch, or why it was voided. */
+    note: string | null;
+  }[];
 }
 
 export interface AttendanceSummary {
@@ -228,3 +236,21 @@ export interface AttendanceConflictView {
   punch: { type: PunchType; occurredAt: string; workDate: string; device: string | null };
   resolution: { by: string | null; at: string; note: string } | null;
 }
+
+const adjustmentReason = z.string().trim().min(3, 'Give a reason').max(500);
+
+/**
+ * HR adds a missing punch (spec §4). `date` and `time` are the wall-clock time in the company
+ * timezone; a time-out after midnight uses the calendar date it happened on.
+ */
+export const addPunchSchema = z.object({
+  type: z.enum(PUNCH_TYPES),
+  date: isoDateSchema,
+  time: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Use HH:MM (24-hour)'),
+  reason: adjustmentReason,
+});
+export type AddPunchInput = z.infer<typeof addPunchSchema>;
+
+/** HR voids a wrong punch. The original stays on record, marked voided. */
+export const voidPunchSchema = z.object({ reason: adjustmentReason });
+export type VoidPunchInput = z.infer<typeof voidPunchSchema>;
