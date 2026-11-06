@@ -208,7 +208,7 @@ POST /kiosk/sync (batch, device token) ─► per item:
 
 ## 11. Deployment architecture
 
-Reference: Docker Compose — `reverse-proxy (Caddy, auto-TLS) → web (static) + api (Node 22) → postgres 16`, plus a scheduled backup container. Configuration by environment variables. Migrations run as a release step (`prisma migrate deploy`). Background jobs (session cleanup, daily absence marking, temp-password expiry) run in-process via `@nestjs/schedule` with a DB advisory lock so only one instance executes each job. Hosting target pending (PROJECT_ANALYSIS Q-6).
+Reference: Docker Compose — `reverse-proxy (Caddy, auto-TLS) → web (static) + api (Node 22) → postgres 16`, plus a scheduled backup container. Configuration by environment variables. Migrations run as a release step (`prisma migrate deploy`). Background jobs (session cleanup, daily absence marking, temp-password expiry) run in-process via `@nestjs/schedule` with a DB advisory lock so only one instance executes each job. Hosting target pending (PROJECT_ANALYSIS Q-6). A Vercel + Neon Postgres deployment (single project, API as a serverless function) is documented in [DEPLOYMENT_VERCEL.md](DEPLOYMENT_VERCEL.md).
 
 ## 12. Timezone
 
