@@ -27,10 +27,12 @@ export function statusWithoutPunches(
   dateHired: string,
   scheduled: boolean,
   isHoliday: boolean,
+  onLeave = false,
 ): DailyStatus {
   if (workDate < dateHired) return 'NOT_EMPLOYED';
   if (isHoliday) return 'HOLIDAY';
   if (!scheduled) return 'REST_DAY';
+  if (onLeave) return 'ON_LEAVE';
   return workDate < today ? 'ABSENT' : 'NOT_YET_IN';
 }
 
@@ -62,6 +64,7 @@ export function summarise(days: AttendanceDayView[]): AttendanceSummary {
     totalOvertimeMinutes: 0,
     absences: 0,
     incomplete: 0,
+    leaveDays: 0,
   };
   for (const d of days) {
     if (d.workedMinutes > 0) s.daysWorked += 1;
@@ -72,6 +75,7 @@ export function summarise(days: AttendanceDayView[]): AttendanceSummary {
     s.totalOvertimeMinutes += d.overtimeMinutes;
     if (d.status === 'ABSENT') s.absences += 1;
     if (d.status === 'INCOMPLETE') s.incomplete += 1;
+    if (d.status === 'ON_LEAVE') s.leaveDays += 1;
   }
   return s;
 }
@@ -97,7 +101,7 @@ export class AttendanceQueryService {
     const end = to > today ? today : to;
     const dates = from <= end ? eachDate(from, end) : [];
 
-    const [records, events, schedule, holidays] = await Promise.all([
+    const [records, events, schedule, holidays, leave] = await Promise.all([
       this.prisma.attendanceDay.findMany({
         where: { employeeId, workDate: { gte: dateColumn(from), lte: dateColumn(end) } },
       }),
@@ -107,6 +111,7 @@ export class AttendanceQueryService {
       }),
       this.schedules.forEmployee(employeeId),
       this.schedules.holidaysBetween(from, end),
+      this.approvedLeave([employeeId], from, end),
     ]);
     const byDate = new Map(records.map((r) => [fromDateColumn(r.workDate), r]));
     const eventsByDate = new Map<string, AttendanceEvent[]>();
@@ -126,6 +131,7 @@ export class AttendanceQueryService {
           holidays.has(d),
           today,
           hired,
+          leave.has(`${employeeId}|${d}`),
         ),
       )
       .filter((d) => d.status !== 'NOT_EMPLOYED')
@@ -194,12 +200,13 @@ export class AttendanceQueryService {
       },
     });
     const ids = employees.map((e) => e.id);
-    const [records, schedules, holidays] = await Promise.all([
+    const [records, schedules, holidays, leave] = await Promise.all([
       this.prisma.attendanceDay.findMany({
         where: { employeeId: { in: ids }, workDate: dateColumn(q.date) },
       }),
       this.schedules.forEmployees(ids),
       this.schedules.holidaysBetween(q.date, q.date),
+      this.approvedLeave(ids, q.date, q.date),
     ]);
     const byEmployee = new Map(records.map((r) => [r.employeeId, r]));
     const isHoliday = holidays.has(q.date);
@@ -210,7 +217,14 @@ export class AttendanceQueryService {
       const scheduled = schedule.windowFor(q.date) !== null;
       const status: DailyStatus = r
         ? statusWithPunches(r, q.date, today, scheduled, isHoliday)
-        : statusWithoutPunches(q.date, today, fromDateColumn(e.dateHired), scheduled, isHoliday);
+        : statusWithoutPunches(
+            q.date,
+            today,
+            fromDateColumn(e.dateHired),
+            scheduled,
+            isHoliday,
+            leave.has(`${e.id}|${q.date}`),
+          );
       return {
         employee: {
           id: e.id,
@@ -238,6 +252,23 @@ export class AttendanceQueryService {
     };
   }
 
+  /** `employeeId|date` keys of approved leave days (spec §3.3: leave is not an absence). */
+  private async approvedLeave(
+    employeeIds: string[],
+    from: string,
+    to: string,
+  ): Promise<Set<string>> {
+    const rows = await this.prisma.leaveRequestDay.findMany({
+      where: {
+        employeeId: { in: employeeIds },
+        date: { gte: dateColumn(from), lte: dateColumn(to) },
+        request: { status: 'APPROVED' },
+      },
+      select: { employeeId: true, date: true },
+    });
+    return new Set(rows.map((r) => `${r.employeeId}|${fromDateColumn(r.date)}`));
+  }
+
   private async scope(actor: AuthContext): Promise<Scope> {
     if (actor.permissions.has(PERMISSIONS.ATTENDANCE_VIEW_ALL)) return { kind: 'all' };
     if (actor.permissions.has(PERMISSIONS.ATTENDANCE_VIEW_DEPARTMENT)) {
@@ -258,6 +289,7 @@ export class AttendanceQueryService {
     isHoliday: boolean,
     today: string,
     hired: string,
+    onLeave: boolean,
   ): AttendanceDayView {
     const punches = events.map((e) => ({
       id: e.id,
@@ -285,7 +317,7 @@ export class AttendanceQueryService {
     }
     return {
       workDate: date,
-      status: statusWithoutPunches(date, today, hired, window !== null, isHoliday),
+      status: statusWithoutPunches(date, today, hired, window !== null, isHoliday, onLeave),
       firstIn: null,
       lastOut: null,
       workedMinutes: 0,

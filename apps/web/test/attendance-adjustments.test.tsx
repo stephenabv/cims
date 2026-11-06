@@ -68,6 +68,7 @@ function range(employeeId: string): AttendanceRangeResult {
       totalOvertimeMinutes: 0,
       absences: 0,
       incomplete: 1,
+      leaveDays: 0,
     },
   };
 }

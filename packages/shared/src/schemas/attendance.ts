@@ -49,6 +49,7 @@ export const attendanceMonitorQuerySchema = paginationSchema.extend({
       'HOLIDAY',
       'REST_DAY_WORKED',
       'HOLIDAY_WORKED',
+      'ON_LEAVE',
     ])
     .optional(),
   search: z.string().trim().max(100).optional(),
@@ -68,6 +69,7 @@ export type DailyStatus =
   | 'REST_DAY'
   | 'HOLIDAY'
   | 'NOT_YET_IN'
+  | 'ON_LEAVE'
   | 'NOT_EMPLOYED';
 
 export interface AttendanceDayView {
@@ -101,6 +103,8 @@ export interface AttendanceSummary {
   totalOvertimeMinutes: number;
   absences: number;
   incomplete: number;
+  /** Scheduled days covered by approved leave. */
+  leaveDays: number;
 }
 
 export interface AttendanceRangeResult {

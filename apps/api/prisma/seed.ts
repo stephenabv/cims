@@ -7,6 +7,7 @@ import * as argon2 from 'argon2';
 import { randomInt } from 'node:crypto';
 import { ALL_PERMISSION_CODES, SYSTEM_ROLES, isWeakPin, passwordSchema } from '@cims/shared';
 import { DEFAULT_ROLES, PERMISSION_DESCRIPTIONS } from '../src/modules/access/default-roles';
+import { ensureDefaultApprovalChain } from '../src/modules/leave/default-chain';
 
 const prisma = new PrismaClient();
 
@@ -102,6 +103,7 @@ async function seedBootstrapAdmin(): Promise<void> {
 
 async function main(): Promise<void> {
   await seedPermissionsAndRoles();
+  await ensureDefaultApprovalChain(prisma);
   await seedBootstrapAdmin();
 }
 

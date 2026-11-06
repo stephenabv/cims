@@ -14,6 +14,7 @@ import { AuditModule } from './modules/audit/audit.module';
 import { AttendanceModule } from './modules/attendance/attendance.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { EmployeesModule } from './modules/employees/employees.module';
+import { LeaveModule } from './modules/leave/leave.module';
 import { HealthController } from './modules/health/health.controller';
 import { SettingsModule } from './modules/settings/settings.module';
 
@@ -60,6 +61,7 @@ import { SettingsModule } from './modules/settings/settings.module';
     AuthModule,
     AccessModule,
     EmployeesModule,
+    LeaveModule,
     AttendanceModule,
   ],
   controllers: [HealthController],

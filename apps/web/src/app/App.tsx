@@ -11,6 +11,8 @@ import {
   MyAttendancePage,
 } from '@/features/attendance/AttendanceHistoryPage';
 import { ConflictsPage } from '@/features/attendance/ConflictsPage';
+import { LeaveApprovalsPage, LeaveRequestsPage, MyLeavePage } from '@/features/leave/LeavePages';
+import { LeaveSettingsPage } from '@/features/leave/LeaveSettingsPage';
 import { KioskDevicesPage } from '@/features/attendance/KioskDevicesPage';
 import { SchedulesPage } from '@/features/attendance/SchedulesPage';
 import { EmployeeDetailPage, MyProfilePage } from '@/features/employees/EmployeeDetailPage';
@@ -74,6 +76,10 @@ export function AppRoutes() {
         <Route path="attendance/conflicts" element={<ConflictsPage />} />
         <Route path="schedules" element={<SchedulesPage />} />
         <Route path="kiosk-devices" element={<KioskDevicesPage />} />
+        <Route path="leave" element={<MyLeavePage />} />
+        <Route path="leave/approvals" element={<LeaveApprovalsPage />} />
+        <Route path="leave/requests" element={<LeaveRequestsPage />} />
+        <Route path="leave/settings" element={<LeaveSettingsPage />} />
         <Route path="*" element={<NotFoundPage />} />
       </Route>
       <Route path="*" element={<NotFoundPage />} />

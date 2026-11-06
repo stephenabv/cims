@@ -35,3 +35,8 @@ export function eachDate(from: string, to: string): string[] {
   }
   return out;
 }
+
+/** Business date `days` after (or before, if negative) `date`. */
+export function addDays(date: string, days: number): string {
+  return DateTime.fromISO(date, { zone: 'UTC' }).plus({ days }).toISODate()!;
+}

@@ -12,6 +12,7 @@ export const DAILY_STATUS: Record<DailyStatus, { label: string; tone: Tone }> = 
   HOLIDAY: { label: 'Holiday', tone: 'info' },
   REST_DAY_WORKED: { label: 'Worked rest day', tone: 'info' },
   HOLIDAY_WORKED: { label: 'Worked holiday', tone: 'info' },
+  ON_LEAVE: { label: 'On leave', tone: 'info' },
   NOT_EMPLOYED: { label: 'Not employed', tone: 'neutral' },
 };
 
@@ -21,6 +22,7 @@ export const MONITOR_STATUSES = [
   'LATE',
   'INCOMPLETE',
   'ABSENT',
+  'ON_LEAVE',
   'NOT_YET_IN',
   'REST_DAY_WORKED',
   'HOLIDAY_WORKED',

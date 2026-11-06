@@ -10,6 +10,7 @@ import { configureApp } from '../src/app.setup';
 import { loadEnv } from '../src/common/config/env';
 import { Clock } from '../src/infrastructure/clock/clock';
 import { Mailer, type MailMessage } from '../src/infrastructure/mail/mailer';
+import { ensureDefaultApprovalChain } from '../src/modules/leave/default-chain';
 import { DEFAULT_ROLES, PERMISSION_DESCRIPTIONS } from '../src/modules/access/default-roles';
 
 export class FakeMailer extends Mailer {
@@ -85,7 +86,7 @@ export async function createTestApp(opts: { throttle?: boolean } = {}): Promise<
 export async function resetData(prisma: PrismaClient): Promise<void> {
   // Append-only triggers block DELETE on audit tables, so TRUNCATE (which bypasses row triggers) is used.
   await prisma.$executeRawUnsafe(
-    'TRUNCATE TABLE attendance_conflict, sync_batch, attendance_day, attendance_event, kiosk_device, holiday, session, password_reset_token, mfa_recovery_code, auth_event, audit_log, employee_change_history, user_account, employee, position, department, company_setting RESTART IDENTITY CASCADE',
+    'TRUNCATE TABLE leave_request_day, leave_approval_step, leave_request, leave_balance, approval_chain_step, approval_chain, leave_type, attendance_conflict, sync_batch, attendance_day, attendance_event, kiosk_device, holiday, session, password_reset_token, mfa_recovery_code, auth_event, audit_log, employee_change_history, user_account, employee, position, department, company_setting RESTART IDENTITY CASCADE',
   );
   // Keep seeded system roles and the default schedule; remove ones created by tests so suites stay order-independent.
   await prisma.role.deleteMany({ where: { isSystem: false } });
@@ -93,6 +94,17 @@ export async function resetData(prisma: PrismaClient): Promise<void> {
   await prisma.companySetting.create({
     data: { key: 'company.allowedEmailDomains', value: ['acme.test'] },
   });
+  // Leave defaults: the migration's seeded types and the seed's default chain.
+  await prisma.leaveType.createMany({
+    data: [
+      { code: 'VL', name: 'Vacation leave' },
+      { code: 'SL', name: 'Sick leave' },
+      { code: 'EL', name: 'Emergency leave' },
+      { code: 'ML', name: 'Maternity leave' },
+      { code: 'PL', name: 'Paternity leave' },
+    ],
+  });
+  await ensureDefaultApprovalChain(prisma);
 }
 
 async function seedAccessControl(prisma: PrismaClient): Promise<void> {
@@ -233,6 +245,10 @@ export class Client {
 
   post(path: string, body?: object, opts?: { csrf?: boolean }): Promise<request.Response> {
     return this.send('post', path, body, opts);
+  }
+
+  put(path: string, body?: object): Promise<request.Response> {
+    return this.send('put', path, body);
   }
 
   async login(user: Pick<TestUser, 'accountNumber' | 'password'>): Promise<request.Response> {

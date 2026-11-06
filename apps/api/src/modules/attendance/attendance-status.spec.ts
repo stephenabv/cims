@@ -10,6 +10,13 @@ describe('statusWithoutPunches', () => {
     expect(statusWithoutPunches('2026-11-01', today, '2026-01-01', false, false)).toBe('REST_DAY');
     expect(statusWithoutPunches('2026-11-04', today, '2026-01-01', true, false)).toBe('ABSENT');
     expect(statusWithoutPunches(today, today, '2026-01-01', true, false)).toBe('NOT_YET_IN');
+    // Approved leave replaces an absence on a working day, but not a holiday or rest day.
+    expect(statusWithoutPunches('2026-11-04', today, '2026-01-01', true, false, true)).toBe(
+      'ON_LEAVE',
+    );
+    expect(statusWithoutPunches('2026-11-03', today, '2026-01-01', true, true, true)).toBe(
+      'HOLIDAY',
+    );
   });
 });
 
@@ -67,6 +74,7 @@ describe('summarise', () => {
       totalOvertimeMinutes: 0,
       absences: 1,
       incomplete: 1,
+      leaveDays: 0,
     });
   });
 });

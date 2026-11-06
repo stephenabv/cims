@@ -229,11 +229,12 @@ function SummaryTiles({ summary }: { summary: AttendanceSummary }) {
       value: `${summary.lateCount} (${formatMinutes(summary.totalLateMinutes)})`,
     },
     { label: 'Absences', value: String(summary.absences) },
+    { label: 'Leave days', value: String(summary.leaveDays) },
     { label: 'Undertime', value: formatMinutes(summary.totalUndertimeMinutes) },
     { label: 'Incomplete days', value: String(summary.incomplete) },
   ];
   return (
-    <dl className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+    <dl className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4 xl:grid-cols-7">
       {tiles.map((t) => (
         <div
           key={t.label}

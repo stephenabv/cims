@@ -25,6 +25,14 @@ export const NAV_ITEMS: NavItem[] = [
     label: 'Sync conflicts',
     requires: [PERMISSIONS.ATTENDANCE_RESOLVE_CONFLICTS],
   },
+  { to: '/app/leave', label: 'My leave', end: true },
+  { to: '/app/leave/approvals', label: 'Leave approvals', requires: [PERMISSIONS.LEAVE_APPROVE] },
+  {
+    to: '/app/leave/requests',
+    label: 'Leave records',
+    requiresAny: [PERMISSIONS.LEAVE_VIEW_ALL, PERMISSIONS.LEAVE_VIEW_DEPARTMENT],
+  },
+  { to: '/app/leave/settings', label: 'Leave settings', requires: [PERMISSIONS.LEAVE_CONFIGURE] },
   {
     to: '/app/employees',
     label: 'Employees',
