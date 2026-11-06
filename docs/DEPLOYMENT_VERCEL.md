@@ -30,7 +30,7 @@ browser ──► Vercel CDN ──► apps/web/dist (static PWA)
 
    | Variable                                                                                | Value                                                                                   |
    | --------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
-   | `NODE_ENV`                                                                              | `production`                                                                            |
+   | `NODE_ENV`                                                                              | `production` (install uses `--prod=false`, so build tools still install)                |
    | `CSRF_SECRET`                                                                           | `openssl rand -base64 48`                                                               |
    | `DATA_ENCRYPTION_KEY`                                                                   | `openssl rand -base64 32` (never change after go-live: it decrypts stored TOTP secrets) |
    | `BOOTSTRAP_ADMIN_EMAIL`                                                                 | First IT administrator's company e-mail (its domain becomes the allowed sign-in domain) |
