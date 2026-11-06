@@ -44,6 +44,10 @@ export const SETTING_DEFINITIONS = {
   'attendance.maxShiftHours': { schema: z.number().int().min(8).max(36), default: 18 },
   /** Offline punches older than this are not applied automatically; HR reviews them. */
   'attendance.maxOfflineHours': { schema: z.number().int().min(1).max(720), default: 72 },
+  /** Daily overtime shorter than this does not create an overtime record (assumption A-12). */
+  'overtime.minimumMinutes': { schema: z.number().int().min(0).max(240), default: 30 },
+  /** Daily undertime shorter than this is not counted toward deductions (spec §3.6). */
+  'undertime.thresholdMinutes': { schema: z.number().int().min(0).max(240), default: 0 },
 } as const;
 
 export type SettingKey = keyof typeof SETTING_DEFINITIONS;

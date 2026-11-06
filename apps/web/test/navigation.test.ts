@@ -31,6 +31,14 @@ describe('navigation', () => {
     expect(labels(['leave.configure'])).toContain('Leave settings');
     expect(labels([])).not.toEqual(expect.arrayContaining(['Leave approvals']));
   });
+  it('shows overtime screens only with overtime permissions', () => {
+    expect(labels(['overtime.approve'])).toContain('Overtime');
+    expect(labels(['overtime.approve'])).not.toContain('Overtime & undertime');
+    expect(labels(['overtime.view.department'])).toEqual(
+      expect.arrayContaining(['Overtime', 'Overtime & undertime']),
+    );
+    expect(labels([])).not.toContain('Overtime');
+  });
   it('shows organisation admin only with org.manage', () => {
     expect(labels(['org.manage'])).toContain('Departments & positions');
   });

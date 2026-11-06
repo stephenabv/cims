@@ -188,6 +188,7 @@ Company timezone, allowed email domains, work schedules, grace periods, undertim
 - **[A-9] Payroll eligibility.** Paid leave adds regular hours to payroll (8h/day or scheduled hours) when the leave type is marked _paid_; unpaid leave does not.
 - **[A-11] Privileged role assignment.** Roles that require 2FA or grant access management (CEO, Executive, HR, IT by default) can only be assigned, changed, or have their holders suspended, by users with `access.manage` (IT). HR provisions and manages Staff-level accounts. Nobody can change their own role or account status. This prevents privilege escalation through the provisioning screen.
 - **[A-10] Supervisor approval of OT** follows the same supervisor relationship used for leave, falling back to HR.
+- **[A-12] Overtime records.** A day's overtime becomes a record for approval only once the day is complete (time-out recorded) and the overtime reaches a company minimum (default **30 minutes**, editable by `payroll.configure`). The direct supervisor, or anyone with `overtime.approve` within their overtime scope, may approve all or part of it or reject it; nobody decides their own. If attendance for that day changes after a decision, the record returns to _pending_ (or is voided when no overtime remains) and the decision history is kept. Daily undertime below a configurable threshold (default **0**, so all undertime counts) is shown but not counted toward deductions. Policy changes apply to days recorded or corrected afterwards.
 
 ## 9. Open questions (to confirm with the project owner)
 
