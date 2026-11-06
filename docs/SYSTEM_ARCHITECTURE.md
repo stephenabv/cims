@@ -90,7 +90,7 @@ user_account 1─1 employee ─< employee_change_history
 employee >─ department, >─ position, >─ employee (supervisor), >─ work_schedule, >─ role
 employee ─< compensation_profile (effective_from, versioned)
 employee ─< attendance_event (immutable punches)  ─> kiosk_device, sync_batch
-employee ─< attendance_day (derived per work_date) ─< attendance_adjustment
+employee ─< attendance_day (derived per work_date)
 attendance_conflict >─ attendance_event (1..n)
 employee ─< overtime_record (per work_date)
 leave_type ─< leave_request >─ employee ─< leave_approval_step
@@ -159,7 +159,7 @@ POST /kiosk/sync (batch, device token) ─► per item:
 ```
 
 - PINs never leave the device in plaintext and the device holds no PIN hashes; it only has the server's **public** key, so a stolen kiosk cannot verify or harvest PINs.
-- Raw events are immutable; HR resolution produces an `attendance_adjustment` and recomputes `attendance_day`. Originals remain for audit.
+- Raw events are immutable (a database trigger blocks deletes and edits to their core fields). HR corrections are recorded on the events themselves rather than in a separate `attendance_adjustment` table: a wrong punch is set to `VOIDED` with who, when and why; a missing punch is added with `source=ADJUSTMENT`, its author and reason. Each correction recomputes `attendance_day` and writes an audit entry in the same transaction. HR cannot correct their own attendance. Originals remain for audit.
 - Each sync batch is recorded (`sync_batch`) with counts and is visible on a sync-status screen.
 - Offline confirmation to the employee says "Recorded offline — pending sync"; the name is not shown offline (no local directory).
 

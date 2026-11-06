@@ -15,6 +15,10 @@ import {
 import { Throttle } from '@nestjs/throttler';
 import type { Request } from 'express';
 import {
+  type AddPunchInput,
+  type VoidPunchInput,
+  addPunchSchema,
+  voidPunchSchema,
   type AttendanceConflictQuery,
   type AttendanceMonitorQuery,
   type KioskSyncInput,
@@ -53,6 +57,7 @@ import { type AuthContext, clientInfo } from '../../common/http/request-context'
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
 import { Clock } from '../../infrastructure/clock/clock';
 import { SettingsService } from '../settings/settings.service';
+import { AttendanceAdjustmentService } from './attendance-adjustment.service';
 import { AttendanceConflictService } from './attendance-conflict.service';
 import { AttendanceQueryService } from './attendance-query.service';
 import { KioskDeviceService } from './kiosk-device.service';
@@ -186,7 +191,31 @@ export class AttendanceController {
   constructor(
     private readonly query: AttendanceQueryService,
     private readonly conflicts: AttendanceConflictService,
+    private readonly adjustments: AttendanceAdjustmentService,
   ) {}
+
+  @Post('employees/:id/punches')
+  @RequirePermissions(PERMISSIONS.ATTENDANCE_ADJUST)
+  addPunch(
+    @Param('id', uuid) id: string,
+    @Body(new ZodValidationPipe(addPunchSchema)) body: AddPunchInput,
+    @CurrentAuth() auth: AuthContext,
+    @Req() req: Request,
+  ): Promise<{ id: string; workDate: string }> {
+    return this.adjustments.addPunch(auth, id, body, clientInfo(req));
+  }
+
+  @Post('punches/:id/void')
+  @HttpCode(204)
+  @RequirePermissions(PERMISSIONS.ATTENDANCE_ADJUST)
+  async voidPunch(
+    @Param('id', uuid) id: string,
+    @Body(new ZodValidationPipe(voidPunchSchema)) body: VoidPunchInput,
+    @CurrentAuth() auth: AuthContext,
+    @Req() req: Request,
+  ): Promise<void> {
+    await this.adjustments.voidPunch(auth, id, body, clientInfo(req));
+  }
 
   @Get('conflicts')
   @RequirePermissions(PERMISSIONS.ATTENDANCE_RESOLVE_CONFLICTS)
