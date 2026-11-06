@@ -363,7 +363,7 @@ function SyncBanner({ offlineMode, offline }: { offlineMode: boolean; offline: O
       role="status"
       className="w-full max-w-md rounded-xl bg-amber-400/15 px-4 py-3 text-center text-sm text-amber-100 ring-1 ring-amber-300/30"
     >
-      {offlineMode
+      {offlineMode || !offline.reachable
         ? `Offline: punches are saved on this device and sent when the connection returns.${waiting}`
         : offline.syncing
           ? `Sending saved punches…${waiting}`

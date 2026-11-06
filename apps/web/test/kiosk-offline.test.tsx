@@ -1,5 +1,5 @@
 import { generateKeyPairSync } from 'node:crypto';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { QueryClient, QueryClientProvider, onlineManager } from '@tanstack/react-query';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
@@ -43,9 +43,13 @@ describe('attendance kiosk offline', () => {
     localStorage.clear();
     localStorage.setItem('cims.kioskDeviceToken', TOKEN);
   });
-  afterEach(() => vi.unstubAllGlobals());
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+    onlineManager.setOnline(true);
+  });
 
-  it('queues encrypted punches on a registered kiosk while the server is unreachable', async () => {
+  function primeRegisteredKiosk() {
     localStorage.setItem('cims.kioskSyncKey', JSON.stringify(KEY));
     localStorage.setItem(
       'cims.kioskStatus',
@@ -57,6 +61,10 @@ describe('attendance kiosk offline', () => {
         serverTime: '2026-11-01T00:00:00.000Z',
       }),
     );
+  }
+
+  it('queues encrypted punches on a registered kiosk while the server is unreachable', async () => {
+    primeRegisteredKiosk();
     goOffline();
     const outbox = new KioskOutbox(new MemoryOutboxStore());
     renderKiosk(outbox);
@@ -73,6 +81,25 @@ describe('attendance kiosk offline', () => {
     const [queued] = await outbox.pending();
     expect(queued).toMatchObject({ keyId: KEY.keyId, type: 'TIME_IN' });
     expect(JSON.stringify(queued)).not.toContain('482915');
+  });
+
+  it('still queues when the browser itself reports no connection', async () => {
+    // Regression: requests paused by the query library while offline must not hang the kiosk.
+    primeRegisteredKiosk();
+    goOffline();
+    vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false);
+    onlineManager.setOnline(false);
+    const outbox = new KioskOutbox(new MemoryOutboxStore());
+    renderKiosk(outbox);
+
+    expect(
+      await screen.findByText(/Offline: punches are saved on this device/),
+    ).toBeInTheDocument();
+    await userEvent.type(screen.getByLabelText('Account number'), '123');
+    await userEvent.type(screen.getByLabelText('PIN'), '482915');
+    await userEvent.click(screen.getByRole('button', { name: 'Time out' }));
+    expect(await screen.findByText('Time out saved offline')).toBeInTheDocument();
+    expect(await outbox.pending()).toHaveLength(1);
   });
 
   it('does not offer offline punching to a kiosk that never synced its key', async () => {
