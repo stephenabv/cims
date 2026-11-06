@@ -43,25 +43,28 @@
   --shadow-lift: 0 12px 32px -12px rgb(10 24 48 / 0.45);
 }
 
-html,
-body,
-#root {
-  height: 100%;
-}
+/* Base styles live in the base layer so utility classes on an element always win. */
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
 
-body {
-  @apply bg-slate-50 text-slate-900 antialiased dark:bg-brand-950 dark:text-slate-100;
-  overflow-x: hidden;
-}
+  body {
+    @apply bg-slate-50 text-slate-900 antialiased dark:bg-brand-950 dark:text-slate-100;
+    overflow-x: hidden;
+  }
 
-h1,
-h2,
-h3 {
-  @apply tracking-tight text-brand-950 dark:text-white;
-}
+  h1,
+  h2,
+  h3 {
+    @apply tracking-tight text-brand-950 dark:text-white;
+  }
 
-:focus-visible {
-  @apply outline-2 outline-offset-2 outline-brand-500;
+  :focus-visible {
+    @apply outline-2 outline-offset-2 outline-brand-500;
+  }
 }
 
 /* Respect users who ask for less motion: keep state changes, drop the movement. */

@@ -77,7 +77,9 @@ describe('sign-in flow', () => {
     await userEvent.type(screen.getByLabelText('Password'), 'Valid-Password-123');
     await userEvent.click(screen.getByRole('button', { name: 'Sign in' }));
 
-    expect(await screen.findByRole('heading', { name: 'Welcome, Ana Santos' })).toBeInTheDocument();
+    expect(
+      await screen.findByRole('heading', { name: /^Good (morning|afternoon|evening), Ana$/ }),
+    ).toBeInTheDocument();
     const login = calls.find((c) => c.path === '/auth/login')!;
     expect(login.headers['X-CSRF-Token']).toBe('n.s');
     expect(login.body).toEqual({ accountNumber: 'EMP-000123', password: 'Valid-Password-123' });

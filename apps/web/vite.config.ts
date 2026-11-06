@@ -17,7 +17,7 @@ export default defineConfig({
         name: 'Company Information Management System',
         short_name: 'CIMS',
         description: 'Attendance, leave, payroll and projects',
-        theme_color: '#1e3a8a',
+        theme_color: '#10264b',
         background_color: '#f8fafc',
         display: 'standalone',
         start_url: '/',
