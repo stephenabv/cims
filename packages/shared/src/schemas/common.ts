@@ -15,3 +15,19 @@ export const isoDateSchema = z
   .string()
   .regex(/^\d{4}-\d{2}-\d{2}$/, 'Use YYYY-MM-DD')
   .refine((v) => !Number.isNaN(Date.parse(`${v}T00:00:00Z`)), 'Invalid date');
+
+export interface NotificationView {
+  id: string;
+  kind: string;
+  title: string;
+  body: string;
+  /** In-app path to open. */
+  link: string | null;
+  createdAt: string;
+  readAt: string | null;
+}
+
+export interface NotificationList {
+  unread: number;
+  data: NotificationView[];
+}

@@ -5,11 +5,17 @@ import { isoDateSchema, paginationSchema, uuidSchema } from './common';
 export const PUNCH_TYPES = ['TIME_IN', 'TIME_OUT'] as const;
 export type PunchType = (typeof PUNCH_TYPES)[number];
 
-/** Kiosk punch. The PIN is format-checked only; weak-PIN rules apply when PINs are set, not used. */
+const kioskPinSchema = z.string().regex(/^\d{6}$/, 'PIN must be 6 digits');
+
+/**
+ * One-step kiosk punch (kept for kiosks still running the previous app version). `type` is
+ * optional: the server decides time in or time out; when a type is sent it must match that
+ * decision. The PIN is format-checked only; weak-PIN rules apply when PINs are set, not used.
+ */
 export const kioskPunchSchema = z.object({
   accountNumber: accountNumberSchema,
-  pin: z.string().regex(/^\d{6}$/, 'PIN must be 6 digits'),
-  type: z.enum(PUNCH_TYPES),
+  pin: kioskPinSchema,
+  type: z.enum(PUNCH_TYPES).optional(),
 });
 export type KioskPunchInput = z.infer<typeof kioskPunchSchema>;
 
@@ -20,6 +26,54 @@ export interface KioskPunchResult {
   /** First name and last initial only: enough to confirm identity on a shared screen. */
   displayName: string;
 }
+
+/** Step 1 of the unified kiosk button: who is this, and what happens if they confirm? */
+export const kioskIdentifySchema = z.object({
+  accountNumber: accountNumberSchema,
+  pin: kioskPinSchema,
+});
+export type KioskIdentifyInput = z.infer<typeof kioskIdentifySchema>;
+
+/**
+ * READY: confirm `action` with `confirmationToken` before `expiresAt`.
+ * COMPLETED: the shift already has a time in and a time out.
+ * JUST_RECORDED: the same person punched moments ago (accidental double press).
+ */
+export type KioskIdentifyResult =
+  | {
+      status: 'READY';
+      displayName: string;
+      action: PunchType;
+      workDate: string;
+      /** When the open shift started (only for TIME_OUT). */
+      timeInAt: string | null;
+      confirmationToken: string;
+      expiresAt: string;
+    }
+  | {
+      status: 'COMPLETED';
+      displayName: string;
+      workDate: string;
+      timeInAt: string;
+      timeOutAt: string;
+    }
+  | {
+      status: 'JUST_RECORDED';
+      displayName: string;
+      workDate: string;
+      type: PunchType;
+      occurredAt: string;
+    };
+
+/** Step 2: record the action the server offered. Idempotent per token. */
+export const kioskConfirmSchema = z.object({
+  confirmationToken: z
+    .string()
+    .min(20)
+    .max(1024)
+    .regex(/^[A-Za-z0-9+/=._-]+$/),
+});
+export type KioskConfirmInput = z.infer<typeof kioskConfirmSchema>;
 
 export const registerKioskSchema = z.object({ name: z.string().trim().min(2).max(100) });
 export type RegisterKioskInput = z.infer<typeof registerKioskSchema>;
@@ -161,15 +215,27 @@ export type HolidayInput = z.infer<typeof holidaySchema>;
 
 // ─── Offline sync (§4) ───────────────────────────────────────────────────────
 
-/** What the kiosk encrypts with the server's public key for each offline punch. */
-export const offlinePunchPayloadSchema = z.object({
-  v: z.literal(1),
-  clientUuid: uuidSchema,
-  accountNumber: accountNumberSchema,
-  pin: z.string().regex(/^\d{6}$/),
-  type: z.enum(PUNCH_TYPES),
-  occurredAt: z.string().datetime({ offset: true }),
-});
+/**
+ * What the kiosk encrypts with the server's public key for each offline punch.
+ * v1: the person chose time in or time out. v2 (unified button): the server decides on sync.
+ */
+export const offlinePunchPayloadSchema = z.discriminatedUnion('v', [
+  z.object({
+    v: z.literal(1),
+    clientUuid: uuidSchema,
+    accountNumber: accountNumberSchema,
+    pin: kioskPinSchema,
+    type: z.enum(PUNCH_TYPES),
+    occurredAt: z.string().datetime({ offset: true }),
+  }),
+  z.object({
+    v: z.literal(2),
+    clientUuid: uuidSchema,
+    accountNumber: accountNumberSchema,
+    pin: kioskPinSchema,
+    occurredAt: z.string().datetime({ offset: true }),
+  }),
+]);
 export type OfflinePunchPayload = z.infer<typeof offlinePunchPayloadSchema>;
 
 export const MAX_SYNC_ITEMS = 200;

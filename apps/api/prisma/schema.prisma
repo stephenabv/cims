@@ -16,20 +16,21 @@ datasource db {
 // ───────────────────────────── Access control ─────────────────────────────
 
 model Role {
-  id                 String              @id @default(uuid()) @db.Uuid
-  key                String              @unique @db.VarChar(50)
-  name               String              @db.VarChar(100)
-  description        String?             @db.VarChar(500)
+  id                 String                     @id @default(uuid()) @db.Uuid
+  key                String                     @unique @db.VarChar(50)
+  name               String                     @db.VarChar(100)
+  description        String?                    @db.VarChar(500)
   /// System roles cannot be deleted or renamed (their permissions remain editable).
-  isSystem           Boolean             @default(false) @map("is_system")
+  isSystem           Boolean                    @default(false) @map("is_system")
   /// Holders must enrol and use TOTP 2FA (spec §3.9, §5).
-  requiresMfa        Boolean             @default(false) @map("requires_mfa")
-  createdAt          DateTime            @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt          DateTime            @updatedAt @map("updated_at") @db.Timestamptz(3)
+  requiresMfa        Boolean                    @default(false) @map("requires_mfa")
+  createdAt          DateTime                   @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt          DateTime                   @updatedAt @map("updated_at") @db.Timestamptz(3)
   permissions        RolePermission[]
   users              UserAccount[]
   approvalChainSteps ApprovalChainStep[]
   leaveApprovalSteps LeaveApprovalStep[]
+  correctionSteps    AttendanceCorrectionStep[]
 
   @@map("role")
 }
@@ -107,44 +108,44 @@ enum EmploymentStatus {
 }
 
 model Employee {
-  id                           String                   @id @default(uuid()) @db.Uuid
+  id                           String                        @id @default(uuid()) @db.Uuid
   /// Permanent, system-assigned identifier (EMP-000123). Never editable (BR-1).
-  accountNumber                String                   @unique @map("account_number") @db.VarChar(20)
-  firstName                    String                   @map("first_name") @db.VarChar(100)
-  middleName                   String?                  @map("middle_name") @db.VarChar(100)
-  lastName                     String                   @map("last_name") @db.VarChar(100)
-  suffix                       String?                  @db.VarChar(20)
+  accountNumber                String                        @unique @map("account_number") @db.VarChar(20)
+  firstName                    String                        @map("first_name") @db.VarChar(100)
+  middleName                   String?                       @map("middle_name") @db.VarChar(100)
+  lastName                     String                        @map("last_name") @db.VarChar(100)
+  suffix                       String?                       @db.VarChar(20)
   /// Approved company email only (BR-6). Stored lower-case.
-  companyEmail                 String                   @unique @map("company_email") @db.VarChar(254)
-  contactNumber                String?                  @map("contact_number") @db.VarChar(30)
-  residentialAddress           String?                  @map("residential_address") @db.VarChar(500)
-  emergencyContactName         String?                  @map("emergency_contact_name") @db.VarChar(200)
-  emergencyContactRelationship String?                  @map("emergency_contact_relationship") @db.VarChar(50)
-  emergencyContactPhone        String?                  @map("emergency_contact_phone") @db.VarChar(30)
-  departmentId                 String?                  @map("department_id") @db.Uuid
-  department                   Department?              @relation("DepartmentMembers", fields: [departmentId], references: [id], onDelete: SetNull)
-  positionId                   String?                  @map("position_id") @db.Uuid
-  position                     Position?                @relation(fields: [positionId], references: [id], onDelete: SetNull)
+  companyEmail                 String                        @unique @map("company_email") @db.VarChar(254)
+  contactNumber                String?                       @map("contact_number") @db.VarChar(30)
+  residentialAddress           String?                       @map("residential_address") @db.VarChar(500)
+  emergencyContactName         String?                       @map("emergency_contact_name") @db.VarChar(200)
+  emergencyContactRelationship String?                       @map("emergency_contact_relationship") @db.VarChar(50)
+  emergencyContactPhone        String?                       @map("emergency_contact_phone") @db.VarChar(30)
+  departmentId                 String?                       @map("department_id") @db.Uuid
+  department                   Department?                   @relation("DepartmentMembers", fields: [departmentId], references: [id], onDelete: SetNull)
+  positionId                   String?                       @map("position_id") @db.Uuid
+  position                     Position?                     @relation(fields: [positionId], references: [id], onDelete: SetNull)
   /// Immediate supervisor / designated approver (§3.3).
-  supervisorId                 String?                  @map("supervisor_id") @db.Uuid
-  supervisor                   Employee?                @relation("Supervision", fields: [supervisorId], references: [id], onDelete: SetNull)
-  subordinates                 Employee[]               @relation("Supervision")
-  classification               EmploymentClassification @default(PROBATIONARY)
-  employmentStatus             EmploymentStatus         @default(ACTIVE) @map("employment_status")
-  dateHired                    DateTime                 @map("date_hired") @db.Date
+  supervisorId                 String?                       @map("supervisor_id") @db.Uuid
+  supervisor                   Employee?                     @relation("Supervision", fields: [supervisorId], references: [id], onDelete: SetNull)
+  subordinates                 Employee[]                    @relation("Supervision")
+  classification               EmploymentClassification      @default(PROBATIONARY)
+  employmentStatus             EmploymentStatus              @default(ACTIVE) @map("employment_status")
+  dateHired                    DateTime                      @map("date_hired") @db.Date
   /// Optimistic concurrency token.
-  version                      Int                      @default(1)
-  createdById                  String?                  @map("created_by_id") @db.Uuid
-  createdAt                    DateTime                 @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt                    DateTime                 @updatedAt @map("updated_at") @db.Timestamptz(3)
+  version                      Int                           @default(1)
+  createdById                  String?                       @map("created_by_id") @db.Uuid
+  createdAt                    DateTime                      @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt                    DateTime                      @updatedAt @map("updated_at") @db.Timestamptz(3)
   /// Null = company default schedule.
-  workScheduleId               String?                  @map("work_schedule_id") @db.Uuid
-  workSchedule                 WorkSchedule?            @relation(fields: [workScheduleId], references: [id], onDelete: SetNull)
+  workScheduleId               String?                       @map("work_schedule_id") @db.Uuid
+  workSchedule                 WorkSchedule?                 @relation(fields: [workScheduleId], references: [id], onDelete: SetNull)
   account                      UserAccount?
   attendanceEvents             AttendanceEvent[]
   attendanceDays               AttendanceDay[]
   attendanceConflicts          AttendanceConflict[]
-  headOfDepartments            Department[]             @relation("DepartmentHead")
+  headOfDepartments            Department[]                  @relation("DepartmentHead")
   changeHistory                EmployeeChangeHistory[]
   leaveRequests                LeaveRequest[]
   leaveRequestDays             LeaveRequestDay[]
@@ -154,6 +155,8 @@ model Employee {
   compensationProfiles         CompensationProfile[]
   payItems                     EmployeePayItem[]
   leaveApprovalSteps           LeaveApprovalStep[]
+  correctionRequests           AttendanceCorrectionRequest[]
+  correctionSteps              AttendanceCorrectionStep[]
 
   @@index([departmentId])
   @@index([supervisorId])
@@ -217,6 +220,7 @@ model UserAccount {
   resetTokens           PasswordResetToken[]
   recoveryCodes         MfaRecoveryCode[]
   authEvents            AuthEvent[]
+  notifications         Notification[]
 
   @@index([roleId])
   @@map("user_account")
@@ -429,28 +433,30 @@ enum AttendanceEventStatus {
 
 /// Raw punches. Never deleted or edited in place; corrections void and re-add (§4 originals preserved).
 model AttendanceEvent {
-  id          String                @id @default(uuid()) @db.Uuid
-  employeeId  String                @map("employee_id") @db.Uuid
-  employee    Employee              @relation(fields: [employeeId], references: [id], onDelete: Restrict)
-  type        AttendanceEventType
+  id                String                        @id @default(uuid()) @db.Uuid
+  employeeId        String                        @map("employee_id") @db.Uuid
+  employee          Employee                      @relation(fields: [employeeId], references: [id], onDelete: Restrict)
+  type              AttendanceEventType
   /// When the punch happened (server time online; device time offline, validated).
-  occurredAt  DateTime              @map("occurred_at") @db.Timestamptz(3)
+  occurredAt        DateTime                      @map("occurred_at") @db.Timestamptz(3)
   /// When the server stored it.
-  recordedAt  DateTime              @default(now()) @map("recorded_at") @db.Timestamptz(3)
+  recordedAt        DateTime                      @default(now()) @map("recorded_at") @db.Timestamptz(3)
   /// Business date (company timezone) the punch belongs to; a time-out inherits its time-in's date.
-  workDate    DateTime              @map("work_date") @db.Date
-  source      AttendanceEventSource
-  status      AttendanceEventStatus @default(ACCEPTED)
-  deviceId    String?               @map("device_id") @db.Uuid
-  device      KioskDevice?          @relation(fields: [deviceId], references: [id], onDelete: SetNull)
+  workDate          DateTime                      @map("work_date") @db.Date
+  source            AttendanceEventSource
+  status            AttendanceEventStatus         @default(ACCEPTED)
+  deviceId          String?                       @map("device_id") @db.Uuid
+  device            KioskDevice?                  @relation(fields: [deviceId], references: [id], onDelete: SetNull)
   /// Client-generated id for idempotent offline sync.
-  clientUuid  String?               @unique @map("client_uuid") @db.Uuid
-  createdById String?               @map("created_by_id") @db.Uuid
-  note        String?               @db.VarChar(500)
-  voidedById  String?               @map("voided_by_id") @db.Uuid
-  voidedAt    DateTime?             @map("voided_at") @db.Timestamptz(3)
-  voidReason  String?               @map("void_reason") @db.VarChar(500)
-  conflict    AttendanceConflict?
+  clientUuid        String?                       @unique @map("client_uuid") @db.Uuid
+  createdById       String?                       @map("created_by_id") @db.Uuid
+  note              String?                       @db.VarChar(500)
+  voidedById        String?                       @map("voided_by_id") @db.Uuid
+  voidedAt          DateTime?                     @map("voided_at") @db.Timestamptz(3)
+  voidReason        String?                       @map("void_reason") @db.VarChar(500)
+  conflict          AttendanceConflict?
+  /// Correction requests that point at this punch.
+  correctionTargets AttendanceCorrectionRequest[] @relation("CorrectionTarget")
 
   @@index([employeeId, occurredAt])
   @@index([employeeId, workDate])
@@ -902,4 +908,111 @@ model EmployeePayItem {
 
   @@index([employeeId, effectiveFrom])
   @@map("employee_pay_item")
+}
+
+// ──────────────────────── Attendance correction requests ────────────────────────
+
+enum AttendanceCorrectionType {
+  CHANGE_TIME_IN
+  CHANGE_TIME_OUT
+  MISSING_TIME_IN
+  MISSING_TIME_OUT
+  INCORRECT_TIMESTAMP
+  /// Free-text request; approval records the decision but changes no punch (HR applies it).
+  OTHER
+
+  @@map("attendance_correction_type")
+}
+
+enum AttendanceCorrectionStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  /// Withdrawn by the employee before any approver acted.
+  CANCELLED
+
+  @@map("attendance_correction_status")
+}
+
+/// An employee's request to correct their own attendance (attendance spec §2). Employees never
+/// edit punches; an approved request voids/adds punches exactly as an HR adjustment does, and
+/// this row keeps the original, requested and applied values for the audit trail.
+model AttendanceCorrectionRequest {
+  id             String                     @id @default(uuid()) @db.Uuid
+  employeeId     String                     @map("employee_id") @db.Uuid
+  employee       Employee                   @relation(fields: [employeeId], references: [id], onDelete: Restrict)
+  /// The attendance record (work date / shift) being corrected.
+  workDate       DateTime                   @map("work_date") @db.Date
+  type           AttendanceCorrectionType
+  /// The punch the request concerns (time in or time out), when there is one.
+  punchType      AttendanceEventType?       @map("punch_type")
+  /// Existing punch to change (CHANGE_* and INCORRECT_TIMESTAMP; optional for OTHER).
+  targetEventId  String?                    @map("target_event_id") @db.Uuid
+  targetEvent    AttendanceEvent?           @relation("CorrectionTarget", fields: [targetEventId], references: [id], onDelete: Restrict)
+  /// Snapshot of the target punch's time when the request was filed.
+  originalAt     DateTime?                  @map("original_at") @db.Timestamptz(3)
+  requestedAt    DateTime?                  @map("requested_at") @db.Timestamptz(3)
+  reason         String                     @db.VarChar(1000)
+  status         AttendanceCorrectionStatus @default(PENDING)
+  /// Optimistic concurrency token: every state change increments it.
+  version        Int                        @default(1)
+  submittedAt    DateTime                   @default(now()) @map("submitted_at") @db.Timestamptz(3)
+  decidedAt      DateTime?                  @map("decided_at") @db.Timestamptz(3)
+  /// User who gave the final decision (or cancelled), and their remarks.
+  decidedById    String?                    @map("decided_by_id") @db.Uuid
+  decisionNote   String?                    @map("decision_note") @db.VarChar(500)
+  /// Punch created when the approved correction was applied, and the punch it replaced.
+  appliedEventId String?                    @map("applied_event_id") @db.Uuid
+  voidedEventId  String?                    @map("voided_event_id") @db.Uuid
+  /// Final value written to the official record.
+  appliedAt      DateTime?                  @map("applied_at") @db.Timestamptz(3)
+  createdAt      DateTime                   @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime                   @updatedAt @map("updated_at") @db.Timestamptz(3)
+  steps          AttendanceCorrectionStep[]
+
+  @@index([employeeId, submittedAt])
+  @@index([status])
+  @@map("attendance_correction_request")
+}
+
+/// Approval chain resolved for one correction request at submission. Steps are never deleted.
+/// Reuses the leave step enums: the workflow states are the same.
+model AttendanceCorrectionStep {
+  id                 String                      @id @default(uuid()) @db.Uuid
+  requestId          String                      @map("request_id") @db.Uuid
+  request            AttendanceCorrectionRequest @relation(fields: [requestId], references: [id], onDelete: Restrict)
+  position           Int
+  kind               ApprovalStepKind
+  approverEmployeeId String?                     @map("approver_employee_id") @db.Uuid
+  approverEmployee   Employee?                   @relation(fields: [approverEmployeeId], references: [id], onDelete: Restrict)
+  approverRoleId     String?                     @map("approver_role_id") @db.Uuid
+  approverRole       Role?                       @relation(fields: [approverRoleId], references: [id], onDelete: Restrict)
+  status             LeaveStepStatus
+  actedById          String?                     @map("acted_by_id") @db.Uuid
+  actedAt            DateTime?                   @map("acted_at") @db.Timestamptz(3)
+  note               String?                     @db.VarChar(500)
+
+  @@unique([requestId, position])
+  @@index([approverEmployeeId, status])
+  @@index([approverRoleId, status])
+  @@map("attendance_correction_step")
+}
+
+// ───────────────────────────── Notifications ─────────────────────────────
+
+/// In-app notice for one user (e.g. a decision on their request). Email is sent best effort too.
+model Notification {
+  id        String      @id @default(uuid()) @db.Uuid
+  userId    String      @map("user_id") @db.Uuid
+  user      UserAccount @relation(fields: [userId], references: [id], onDelete: Cascade)
+  kind      String      @db.VarChar(50)
+  title     String      @db.VarChar(200)
+  body      String      @db.VarChar(1000)
+  /// In-app path to open, e.g. /app/attendance/corrections.
+  link      String?     @db.VarChar(300)
+  readAt    DateTime?   @map("read_at") @db.Timestamptz(3)
+  createdAt DateTime    @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  @@index([userId, createdAt])
+  @@map("notification")
 }

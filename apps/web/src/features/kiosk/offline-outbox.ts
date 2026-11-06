@@ -20,8 +20,11 @@ export interface QueuedPunch {
   clientUuid: string;
   keyId: string;
   ciphertext: string;
-  /** Kept in clear only for the on-screen pending count and age; carries no credentials. */
-  type: PunchType;
+  /**
+   * Kept in clear only for the on-screen pending count and age; carries no credentials.
+   * `AUTO`: unified button, the server decides time in or out when the punch is synced.
+   */
+  type: PunchType | 'AUTO';
   queuedAt: string;
 }
 
@@ -162,16 +165,20 @@ export class KioskOutbox {
   /** Encrypts and queues a punch. The occurred-at time is this device's clock (validated on sync). */
   async enqueue(
     key: KioskSyncKey,
-    punch: { accountNumber: string; pin: string; type: PunchType },
+    punch: { accountNumber: string; pin: string; type?: PunchType },
   ): Promise<QueuedPunch> {
     const clientUuid = crypto.randomUUID();
     const at = this.now().toISOString();
-    const ciphertext = await encryptPayload(key, { v: 1, clientUuid, occurredAt: at, ...punch });
+    const { accountNumber, pin, type } = punch;
+    const payload: OfflinePunchPayload = type
+      ? { v: 1, clientUuid, occurredAt: at, accountNumber, pin, type }
+      : { v: 2, clientUuid, occurredAt: at, accountNumber, pin };
+    const ciphertext = await encryptPayload(key, payload);
     const item: QueuedPunch = {
       clientUuid,
       keyId: key.keyId,
       ciphertext,
-      type: punch.type,
+      type: type ?? 'AUTO',
       queuedAt: at,
     };
     await this.store.add(item);

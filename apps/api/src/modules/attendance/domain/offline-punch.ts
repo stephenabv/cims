@@ -30,7 +30,9 @@ export type OfflineConflictReason =
   | 'ALREADY_TIMED_IN'
   | 'NOT_TIMED_IN'
   | 'SHIFT_TOO_LONG'
-  | 'OUT_OF_SEQUENCE';
+  | 'OUT_OF_SEQUENCE'
+  /** Unified button: the shift already had a time in and a time out. */
+  | 'ALREADY_COMPLETED';
 
 export type OfflineDecision =
   | { kind: 'APPLY' }

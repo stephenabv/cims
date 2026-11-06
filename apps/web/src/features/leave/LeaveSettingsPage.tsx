@@ -16,6 +16,7 @@ import { SelectField } from '@/components/ui/SelectField';
 import { Spinner } from '@/components/ui/Spinner';
 import { TextField } from '@/components/ui/TextField';
 import { ApiError, errorMessage } from '@/lib/api-client';
+import { useCorrectionSettings, useSaveCorrectionSettings } from '../corrections/api';
 import { useEmployees } from '../employees/api';
 import {
   useAllLeaveTypes,
@@ -39,6 +40,7 @@ export function LeaveSettingsPage() {
       <div className="grid gap-6">
         <TypesCard />
         <ChainsCard />
+        <CorrectionApprovalCard />
         <BalancesCard />
       </div>
     </>
@@ -204,6 +206,54 @@ function TypeDialog({
         </div>
       </form>
     </Dialog>
+  );
+}
+
+// ── Attendance corrections ────────────────────────────────────────────────────
+
+/** Which approval chain attendance correction requests follow (defaults to the default chain). */
+function CorrectionApprovalCard() {
+  const chains = useApprovalChains();
+  const settings = useCorrectionSettings(true);
+  const save = useSaveCorrectionSettings();
+  const [value, setValue] = useState<string | null>(null);
+  const current = value ?? settings.data?.approvalChainId ?? '';
+
+  return (
+    <Card
+      title="Attendance correction approvals"
+      description="The approval chain employees' attendance correction requests follow. Changes apply to new requests only."
+    >
+      {chains.isError || settings.isError ? (
+        <Alert tone="error">{errorMessage(chains.error ?? settings.error)}</Alert>
+      ) : chains.isPending || settings.isPending ? (
+        <Spinner />
+      ) : (
+        <form
+          className="flex flex-wrap items-end gap-3"
+          onSubmit={(e) => {
+            e.preventDefault();
+            save.mutate(current || null, { onSuccess: () => setValue(null) });
+          }}
+        >
+          <div className="min-w-64 flex-1">
+            <SelectField
+              label="Approval chain"
+              value={current}
+              onChange={(e) => setValue(e.target.value)}
+              options={[
+                { value: '', label: 'Default chain' },
+                ...chains.data.map((c) => ({ value: c.id, label: c.name })),
+              ]}
+            />
+          </div>
+          <Button type="submit" loading={save.isPending} disabled={value === null}>
+            Save
+          </Button>
+          {save.isError && <Alert tone="error">{errorMessage(save.error)}</Alert>}
+        </form>
+      )}
+    </Card>
   );
 }
 

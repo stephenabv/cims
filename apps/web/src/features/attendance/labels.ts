@@ -47,6 +47,7 @@ export const CONFLICT_REASON: Record<string, string> = {
   SHIFT_TOO_LONG: 'Time-out too long after the time-in',
   OUT_OF_SEQUENCE: 'Out of order with existing punches',
   TOO_OLD: 'Synced too long after it was recorded',
+  ALREADY_COMPLETED: 'Pressed after the shift already had a time in and out',
 };
 
 export const PUNCH_SOURCE: Record<string, string> = {

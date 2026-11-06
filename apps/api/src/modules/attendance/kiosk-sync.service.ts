@@ -3,6 +3,7 @@ import {
   type KioskSyncInput,
   type KioskSyncResult,
   type OfflinePunchPayload,
+  type PunchType,
   type SyncItemStatus,
   offlinePunchPayloadSchema,
 } from '@cims/shared';
@@ -15,6 +16,7 @@ import { SettingsService } from '../settings/settings.service';
 import { AttendanceDayService } from './attendance-day.service';
 import { type OfflinePolicy, assessOfflinePunch } from './domain/offline-punch';
 import { dateColumn, fromDateColumn, workDateOf } from './domain/work-date';
+import { type KioskActionContext, KioskActionService } from './kiosk-action.service';
 import { KioskIdentityService } from './kiosk-identity.service';
 import { KioskSyncKeyService } from './kiosk-sync-key.service';
 
@@ -40,6 +42,7 @@ export class KioskSyncService {
     private readonly days: AttendanceDayService,
     private readonly audit: AuditService,
     private readonly clock: Clock,
+    private readonly actions: KioskActionService,
   ) {}
 
   async sync(
@@ -61,6 +64,7 @@ export class KioskSyncService {
       maxOfflineAgeMs: s['attendance.maxOfflineHours'] * 3_600_000,
     };
 
+    const actionCtx = await this.actions.context();
     const results = new Map<string, ItemResult>();
     const decoded: OfflinePunchPayload[] = [];
     for (const item of input.items) {
@@ -81,7 +85,15 @@ export class KioskSyncService {
     for (const payload of decoded) {
       results.set(
         payload.clientUuid,
-        await this.applyOne(payload, deviceId, now, policy, s['company.timezone'], client),
+        await this.applyOne(
+          payload,
+          deviceId,
+          now,
+          policy,
+          s['company.timezone'],
+          actionCtx,
+          client,
+        ),
       );
     }
 
@@ -107,6 +119,7 @@ export class KioskSyncService {
     now: Date,
     policy: OfflinePolicy,
     timezone: string,
+    actionCtx: KioskActionContext,
     client: ClientInfo,
   ): Promise<ItemResult> {
     const result = (status: SyncItemStatus, reason?: string): ItemResult => ({
@@ -149,8 +162,28 @@ export class KioskSyncService {
           }),
         ]);
         const toPunch = (e: typeof previous) => (e ? { type: e.type, at: e.occurredAt } : null);
-        const decision = assessOfflinePunch(
-          { type: p.type, at },
+
+        // v2 (unified button): the server decides time in or out, as the online kiosk would have
+        // at that moment. v1: the person chose; a time-out joins the time-in it closes.
+        let type: PunchType;
+        let workDate: string;
+        let completed = false;
+        if (p.v === 2) {
+          const action = await this.actions.decide(tx, employeeId, at, actionCtx);
+          if (action.kind === 'JUST_RECORDED') return result('DUPLICATE');
+          type = action.kind === 'TIME_OUT' ? 'TIME_OUT' : 'TIME_IN';
+          workDate = action.workDate;
+          completed = action.kind === 'COMPLETED';
+        } else {
+          type = p.type;
+          workDate =
+            p.type === 'TIME_OUT' && previous?.type === 'TIME_IN'
+              ? fromDateColumn(previous.workDate)
+              : workDateOf(at, timezone);
+        }
+
+        let decision = assessOfflinePunch(
+          { type, at },
           toPunch(previous),
           toPunch(next),
           now,
@@ -158,16 +191,14 @@ export class KioskSyncService {
         );
         if (decision.kind === 'DUPLICATE') return result('DUPLICATE');
         if (decision.kind === 'REJECT') return result('REJECTED', decision.reason);
+        // The shift already has a time in and out: keep the press for HR rather than open a second session.
+        if (completed && decision.kind === 'APPLY')
+          decision = { kind: 'CONFLICT', reason: 'ALREADY_COMPLETED' };
 
-        // A time-out belongs to the work date of the time-in it closes.
-        const workDate =
-          p.type === 'TIME_OUT' && previous?.type === 'TIME_IN'
-            ? fromDateColumn(previous.workDate)
-            : workDateOf(at, timezone);
         const event = await tx.attendanceEvent.create({
           data: {
             employeeId,
-            type: p.type,
+            type,
             occurredAt: at,
             recordedAt: now,
             workDate: dateColumn(workDate),
@@ -183,7 +214,7 @@ export class KioskSyncService {
             success: true,
             userId: verified.identity.userId,
             accountNumber: p.accountNumber,
-            reason: `offline_${p.type.toLowerCase()}`,
+            reason: `offline_${type.toLowerCase()}`,
             client,
           },
           tx,

@@ -72,14 +72,17 @@ describe('attendance kiosk offline', () => {
     expect(
       await screen.findByText(/Offline: punches are saved on this device/),
     ).toBeInTheDocument();
-    await userEvent.type(screen.getByLabelText('Account number'), '123');
+    await userEvent.type(screen.getByLabelText('Employee number'), '123');
     await userEvent.type(screen.getByLabelText('PIN'), '482915');
-    await userEvent.click(screen.getByRole('button', { name: 'Time in' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Record attendance' }));
+    expect(await screen.findByText('Save attendance offline?')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Save offline' }));
 
-    expect(await screen.findByText('Time in saved offline')).toBeInTheDocument();
+    expect(await screen.findByText('Attendance saved offline')).toBeInTheDocument();
     expect(screen.getByText(/1 punch is waiting to be sent/)).toBeInTheDocument();
     const [queued] = await outbox.pending();
-    expect(queued).toMatchObject({ keyId: KEY.keyId, type: 'TIME_IN' });
+    // The server decides time in or out when it receives the press.
+    expect(queued).toMatchObject({ keyId: KEY.keyId, type: 'AUTO' });
     expect(JSON.stringify(queued)).not.toContain('482915');
   });
 
@@ -95,10 +98,11 @@ describe('attendance kiosk offline', () => {
     expect(
       await screen.findByText(/Offline: punches are saved on this device/),
     ).toBeInTheDocument();
-    await userEvent.type(screen.getByLabelText('Account number'), '123');
+    await userEvent.type(screen.getByLabelText('Employee number'), '123');
     await userEvent.type(screen.getByLabelText('PIN'), '482915');
-    await userEvent.click(screen.getByRole('button', { name: 'Time out' }));
-    expect(await screen.findByText('Time out saved offline')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Record attendance' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Save offline' }));
+    expect(await screen.findByText('Attendance saved offline')).toBeInTheDocument();
     expect(await outbox.pending()).toHaveLength(1);
   });
 

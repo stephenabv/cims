@@ -25,7 +25,7 @@ export const SelectField = forwardRef<HTMLSelectElement, SelectFieldProps>(funct
         aria-invalid={error ? true : undefined}
         aria-describedby={error ? `${selectId}-error` : undefined}
         className={clsx(
-          'min-h-10 rounded-lg border bg-white px-3 py-2 text-sm text-slate-900 dark:bg-slate-900 dark:text-slate-100',
+          'min-h-10 w-full rounded-xl border bg-white px-3 py-2 text-sm text-slate-900 shadow-xs focus:border-brand-500 dark:bg-slate-900 dark:text-slate-100',
           error ? 'border-red-500' : 'border-slate-300 dark:border-slate-700',
         )}
         {...rest}

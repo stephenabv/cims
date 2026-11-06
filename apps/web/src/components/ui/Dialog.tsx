@@ -26,10 +26,10 @@ export function Dialog({
       aria-labelledby={titleId}
       onClose={onClose}
       onCancel={onClose}
-      className="m-auto w-[calc(100%-2rem)] max-w-md rounded-2xl bg-white p-0 text-slate-900 shadow-xl backdrop:bg-slate-900/40 dark:bg-slate-900 dark:text-slate-100"
+      className="m-auto w-[calc(100%-2rem)] max-w-lg rounded-3xl bg-white p-0 text-slate-900 shadow-[var(--shadow-lift)] backdrop:bg-brand-950/50 backdrop:backdrop-blur-sm dark:bg-slate-900 dark:text-slate-100"
     >
       {open && (
-        <div className="p-6">
+        <div className="max-h-[85vh] overflow-y-auto p-6 sm:p-7">
           <h2 id={titleId} className="text-lg font-semibold">
             {title}
           </h2>

@@ -30,8 +30,24 @@ import {
   resolveConflictSchema,
   ERROR_CODES,
   type HolidayInput,
+  type CancelCorrectionInput,
+  type CorrectionDecisionInput,
+  type CorrectionSettingsInput,
+  type MyCorrectionsQuery,
+  type SubmitCorrectionInput,
+  cancelCorrectionSchema,
+  correctionDecisionSchema,
+  correctionSettingsSchema,
+  myCorrectionsQuerySchema,
+  paginationSchema,
+  submitCorrectionSchema,
+  type KioskConfirmInput,
+  type KioskIdentifyInput,
+  type KioskIdentifyResult,
   type KioskPunchInput,
   type KioskPunchResult,
+  kioskConfirmSchema,
+  kioskIdentifySchema,
   type MyAttendanceQuery,
   PERMISSIONS,
   type RegisterKioskInput,
@@ -58,6 +74,7 @@ import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
 import { Clock } from '../../infrastructure/clock/clock';
 import { SettingsService } from '../settings/settings.service';
 import { AttendanceAdjustmentService } from './attendance-adjustment.service';
+import { AttendanceCorrectionService } from './attendance-correction.service';
 import { AttendanceConflictService } from './attendance-conflict.service';
 import { AttendanceQueryService } from './attendance-query.service';
 import { KioskDeviceService } from './kiosk-device.service';
@@ -133,16 +150,8 @@ export class KioskController {
     };
   }
 
-  @Post('punch')
-  @HttpCode(201)
-  @Public()
-  @SkipCsrf()
-  // Busy kiosks serve many people from one IP; per-account PIN lockout is the main brute-force control.
-  @Throttle({ default: { limit: 60, ttl: 60_000 } })
-  async punch(
-    @Body(new ZodValidationPipe(kioskPunchSchema)) body: KioskPunchInput,
-    @Req() req: Request,
-  ): Promise<KioskPunchResult> {
+  /** Registered device, or null when unregistered browsers are allowed to take punches. */
+  private async punchingDevice(req: Request): Promise<{ id: string } | null> {
     const device = await this.devices.authenticate(req.header(KIOSK_TOKEN_HEADER));
     if (!device && !(await this.settings.get('attendance.allowUnregisteredDevices'))) {
       throw new UnauthenticatedError(
@@ -150,6 +159,49 @@ export class KioskController {
         'This device is not registered for attendance. Ask IT to register it.',
       );
     }
+    return device;
+  }
+
+  /** Unified button, step 1: verify the PIN and say whether the press will be a time in or out. */
+  @Post('identify')
+  @HttpCode(200)
+  @Public()
+  @SkipCsrf()
+  // Busy kiosks serve many people from one IP; per-account PIN lockout is the main brute-force control.
+  @Throttle({ default: { limit: 60, ttl: 60_000 } })
+  async identify(
+    @Body(new ZodValidationPipe(kioskIdentifySchema)) body: KioskIdentifyInput,
+    @Req() req: Request,
+  ): Promise<KioskIdentifyResult> {
+    const device = await this.punchingDevice(req);
+    return this.punches.identify(body, device?.id ?? null, clientInfo(req));
+  }
+
+  /** Unified button, step 2: record the offered action with the server's time. Idempotent per token. */
+  @Post('confirm')
+  @HttpCode(201)
+  @Public()
+  @SkipCsrf()
+  @Throttle({ default: { limit: 60, ttl: 60_000 } })
+  async confirm(
+    @Body(new ZodValidationPipe(kioskConfirmSchema)) body: KioskConfirmInput,
+    @Req() req: Request,
+  ): Promise<KioskPunchResult> {
+    const device = await this.punchingDevice(req);
+    return this.punches.confirm(body.confirmationToken, device?.id ?? null, clientInfo(req));
+  }
+
+  /** One-step punch kept for kiosks still running the previous version of the app. */
+  @Post('punch')
+  @HttpCode(201)
+  @Public()
+  @SkipCsrf()
+  @Throttle({ default: { limit: 60, ttl: 60_000 } })
+  async punch(
+    @Body(new ZodValidationPipe(kioskPunchSchema)) body: KioskPunchInput,
+    @Req() req: Request,
+  ): Promise<KioskPunchResult> {
+    const device = await this.punchingDevice(req);
     return this.punches.punch(body, device?.id ?? null, clientInfo(req));
   }
 }
@@ -270,6 +322,89 @@ export class AttendanceController {
     @CurrentAuth() auth: AuthContext,
   ) {
     return this.query.monitor(auth, q);
+  }
+}
+
+/**
+ * Employee attendance correction requests (attendance spec §2). Filing and cancelling are for the
+ * signed-in employee's own records only; deciding is for the approver of the current step.
+ */
+@Controller('attendance/corrections')
+export class AttendanceCorrectionsController {
+  constructor(private readonly corrections: AttendanceCorrectionService) {}
+
+  @Post()
+  @Authenticated()
+  submit(
+    @Body(new ZodValidationPipe(submitCorrectionSchema)) body: SubmitCorrectionInput,
+    @CurrentAuth() auth: AuthContext,
+    @Req() req: Request,
+  ) {
+    return this.corrections.submit(auth, body, clientInfo(req));
+  }
+
+  @Get('mine')
+  @Authenticated()
+  mine(
+    @Query(new ZodValidationPipe(myCorrectionsQuerySchema)) q: MyCorrectionsQuery,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.corrections.mine(auth, q);
+  }
+
+  @Get('approvals')
+  @Authenticated()
+  approvals(
+    @Query(new ZodValidationPipe(paginationSchema)) q: { page: number; pageSize: number },
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.corrections.approvals(auth, q);
+  }
+
+  @Get('settings')
+  @RequirePermissions(PERMISSIONS.LEAVE_CONFIGURE)
+  settings() {
+    return this.corrections.approvalChainSetting();
+  }
+
+  @Put('settings')
+  @HttpCode(204)
+  @RequirePermissions(PERMISSIONS.LEAVE_CONFIGURE)
+  async updateSettings(
+    @Body(new ZodValidationPipe(correctionSettingsSchema)) body: CorrectionSettingsInput,
+    @CurrentAuth() auth: AuthContext,
+  ): Promise<void> {
+    await this.corrections.setApprovalChain(auth, body.approvalChainId);
+  }
+
+  @Get(':id')
+  @Authenticated()
+  get(@Param('id', uuid) id: string, @CurrentAuth() auth: AuthContext) {
+    return this.corrections.get(auth, id);
+  }
+
+  @Post(':id/decision')
+  @HttpCode(200)
+  @Authenticated()
+  decide(
+    @Param('id', uuid) id: string,
+    @Body(new ZodValidationPipe(correctionDecisionSchema)) body: CorrectionDecisionInput,
+    @CurrentAuth() auth: AuthContext,
+    @Req() req: Request,
+  ) {
+    return this.corrections.decide(auth, id, body, clientInfo(req));
+  }
+
+  @Post(':id/cancel')
+  @HttpCode(200)
+  @Authenticated()
+  cancel(
+    @Param('id', uuid) id: string,
+    @Body(new ZodValidationPipe(cancelCorrectionSchema)) body: CancelCorrectionInput,
+    @CurrentAuth() auth: AuthContext,
+    @Req() req: Request,
+  ) {
+    return this.corrections.cancel(auth, id, body, clientInfo(req));
   }
 }
 

@@ -1,8 +1,14 @@
-import { type AttendanceSummary, type OvertimeRecordView, PERMISSIONS } from '@cims/shared';
+import {
+  type AttendanceDayView,
+  type AttendanceSummary,
+  type OvertimeRecordView,
+  PERMISSIONS,
+} from '@cims/shared';
 import { Fragment, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { Alert } from '@/components/ui/Alert';
 import { Badge } from '@/components/ui/Badge';
+import { Button } from '@/components/ui/Button';
 import { PageHeader } from '@/components/ui/Card';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Spinner } from '@/components/ui/Spinner';
@@ -13,6 +19,7 @@ import { addDays, formatMinutes, formatTime, formatWorkDate, todayIn } from '@/l
 import { useMyOvertime, useOvertimeList, useOvertimeWaiting } from '../overtime/api';
 import { OVERTIME_STATUS } from '../overtime/labels';
 import { useAttendanceRange } from './api';
+import { RequestCorrectionDialog } from '../corrections/RequestCorrectionDialog';
 import { DayPunches } from './DayPunches';
 import { DAILY_STATUS } from './labels';
 
@@ -51,6 +58,12 @@ function AttendanceHistory({ employeeId }: { employeeId?: string }) {
   const canAdjust =
     !!employeeId && employeeId !== user?.employeeId && can(PERMISSIONS.ATTENDANCE_ADJUST);
   const [open, setOpen] = useState<string | null>(null);
+  const [correcting, setCorrecting] = useState<AttendanceDayView | null>(null);
+  // Employees request corrections for their own past or current days; they never edit punches.
+  const canRequest = (d: AttendanceDayView) =>
+    !employeeId &&
+    d.status !== 'NOT_EMPLOYED' &&
+    d.workDate <= todayIn(range.data?.timezone ?? 'Asia/Manila');
   const overtime = useOvertimeByDate(employeeId, from, to, !rangeError);
   const waiting = useOvertimeWaiting();
   const waitingCount = employeeId ? 0 : (waiting.data?.count ?? 0);
@@ -216,6 +229,17 @@ function AttendanceHistory({ employeeId }: { employeeId?: string }) {
                                 timezone={tz}
                                 employeeId={canAdjust ? employeeId : undefined}
                               />
+                              {canRequest(d) && (
+                                <div className="mt-3">
+                                  <Button
+                                    size="sm"
+                                    variant="secondary"
+                                    onClick={() => setCorrecting(d)}
+                                  >
+                                    Request correction
+                                  </Button>
+                                </div>
+                              )}
                             </div>
                           </td>
                         </tr>
@@ -225,6 +249,13 @@ function AttendanceHistory({ employeeId }: { employeeId?: string }) {
                 </tbody>
               </table>
             </div>
+          )}
+          {correcting && (
+            <RequestCorrectionDialog
+              day={correcting}
+              timezone={tz}
+              onClose={() => setCorrecting(null)}
+            />
           )}
           <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">
             Overtime shown here is time worked beyond schedule. Only approved overtime is paid;

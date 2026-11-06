@@ -5,7 +5,11 @@ describe('accountNumberSchema', () => {
   it('normalises case and whitespace', () => {
     expect(accountNumberSchema.parse('  emp-000123 ')).toBe('EMP-000123');
   });
-  it.each(['EMP-123', '000123', 'EMP-0001234', 'XYZ-000123'])('rejects %s', (v) => {
+  it('accepts the employee-number shortcuts', () => {
+    expect(accountNumberSchema.parse('000123')).toBe('EMP-000123');
+    expect(accountNumberSchema.parse('EMP-123')).toBe('EMP-000123');
+  });
+  it.each(['EMP-1234567', 'XYZ-000123', 'EMP-12a'])('rejects %s', (v) => {
     expect(accountNumberSchema.safeParse(v).success).toBe(false);
   });
 });
