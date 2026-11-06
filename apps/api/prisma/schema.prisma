@@ -149,6 +149,8 @@ model Employee {
   leaveBalances                LeaveBalance[]
   approvalChainSteps           ApprovalChainStep[]
   overtimeRecords              OvertimeRecord[]
+  compensationProfiles         CompensationProfile[]
+  payItems                     EmployeePayItem[]
   leaveApprovalSteps           LeaveApprovalStep[]
 
   @@index([departmentId])
@@ -772,4 +774,130 @@ model OvertimeHistory {
 
   @@index([recordId, actedAt])
   @@map("overtime_history")
+}
+
+// ───────────────────────────── Payroll setup (§3.4) ─────────────────────────────
+// Money is stored as integer centavos (PHP); rates never use floating point.
+
+enum UndertimePolicyKind {
+  /// Missed minutes × hourly rate ÷ 60.
+  HOURLY_EQUIVALENT
+  /// A fixed amount per block of minutes (e.g. ₱50 per 30 minutes).
+  FIXED_PER_BLOCK
+  /// A company table: the first tier whose limit covers the day's minutes.
+  TIERED
+
+  @@map("undertime_policy_kind")
+}
+
+/// Company-defined undertime deduction rules; each compensation profile points at one.
+model UndertimePolicy {
+  id                     String                @id @default(uuid()) @db.Uuid
+  name                   String                @unique @db.VarChar(100)
+  kind                   UndertimePolicyKind
+  blockMinutes           Int?                  @map("block_minutes")
+  amountPerBlockCentavos Int?                  @map("amount_per_block_centavos")
+  /// FIXED_PER_BLOCK: a started block counts as a whole block.
+  chargePartialBlock     Boolean               @default(true) @map("charge_partial_block")
+  /// TIERED: [{ upToMinutes, amountCentavos }] in ascending order (validated by the API).
+  tiers                  Json?
+  isDefault              Boolean               @default(false) @map("is_default")
+  isActive               Boolean               @default(true) @map("is_active")
+  createdAt              DateTime              @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt              DateTime              @updatedAt @map("updated_at") @db.Timestamptz(3)
+  profiles               CompensationProfile[]
+
+  @@map("undertime_policy")
+}
+
+enum OvertimeRateKind {
+  /// Hourly rate × multiplier (per mille: 1250 = 1.25×).
+  MULTIPLIER
+  /// A fixed amount per overtime hour.
+  FIXED
+
+  @@map("overtime_rate_kind")
+}
+
+enum PaySchedule {
+  SEMI_MONTHLY
+  ROLLING_15_DAY
+  MONTHLY
+
+  @@map("pay_schedule")
+}
+
+/// An employee's pay terms from a date onwards. Append-only: a change is a new version, so past
+/// payrolls stay reproducible. Only versions that have not started yet may be removed.
+model CompensationProfile {
+  id                         String           @id @default(uuid()) @db.Uuid
+  employeeId                 String           @map("employee_id") @db.Uuid
+  employee                   Employee         @relation(fields: [employeeId], references: [id], onDelete: Restrict)
+  effectiveFrom              DateTime         @map("effective_from") @db.Date
+  hourlyRateCentavos         Int              @map("hourly_rate_centavos")
+  overtimeRateKind           OvertimeRateKind @map("overtime_rate_kind")
+  overtimeMultiplierPermille Int?             @map("overtime_multiplier_permille")
+  overtimeFixedRateCentavos  Int?             @map("overtime_fixed_rate_centavos")
+  undertimePolicyId          String           @map("undertime_policy_id") @db.Uuid
+  undertimePolicy            UndertimePolicy  @relation(fields: [undertimePolicyId], references: [id], onDelete: Restrict)
+  paySchedule                PaySchedule      @map("pay_schedule")
+  note                       String?          @db.VarChar(500)
+  createdById                String           @map("created_by_id") @db.Uuid
+  createdAt                  DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  @@unique([employeeId, effectiveFrom])
+  @@map("compensation_profile")
+}
+
+enum PayItemDirection {
+  ALLOWANCE
+  DEDUCTION
+
+  @@map("pay_item_direction")
+}
+
+enum PayItemCalculation {
+  /// The same amount every payroll.
+  FIXED
+  /// A share of gross pay (basis points: 450 = 4.5%).
+  PERCENT_OF_GROSS
+
+  @@map("pay_item_calculation")
+}
+
+/// Kinds of recurring allowances and deductions (SSS, PhilHealth, Pag-IBIG, tax, loans…; Q-2).
+model PayItemType {
+  id        String            @id @default(uuid()) @db.Uuid
+  code      String            @unique @db.VarChar(20)
+  name      String            @unique @db.VarChar(100)
+  direction PayItemDirection
+  isActive  Boolean           @default(true) @map("is_active")
+  createdAt DateTime          @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime          @updatedAt @map("updated_at") @db.Timestamptz(3)
+  items     EmployeePayItem[]
+
+  @@map("pay_item_type")
+}
+
+/// An allowance or deduction applied to every payroll of one employee between two dates.
+model EmployeePayItem {
+  id              String             @id @default(uuid()) @db.Uuid
+  employeeId      String             @map("employee_id") @db.Uuid
+  employee        Employee           @relation(fields: [employeeId], references: [id], onDelete: Restrict)
+  typeId          String             @map("type_id") @db.Uuid
+  type            PayItemType        @relation(fields: [typeId], references: [id], onDelete: Restrict)
+  calculation     PayItemCalculation
+  amountCentavos  Int?               @map("amount_centavos")
+  rateBasisPoints Int?               @map("rate_basis_points")
+  effectiveFrom   DateTime           @map("effective_from") @db.Date
+  /// Inclusive; null = until further notice.
+  effectiveTo     DateTime?          @map("effective_to") @db.Date
+  note            String?            @db.VarChar(500)
+  version         Int                @default(1)
+  createdById     String             @map("created_by_id") @db.Uuid
+  createdAt       DateTime           @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt       DateTime           @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@index([employeeId, effectiveFrom])
+  @@map("employee_pay_item")
 }

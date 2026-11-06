@@ -6,8 +6,9 @@ import {
   PERMISSIONS,
 } from '@cims/shared';
 import { clsx } from 'clsx';
-import { type ReactNode, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { useState } from 'react';
+import { Link } from 'react-router-dom';
+import { Loading, useQueryState, WithCompanyTimezone } from '@/components/PageState';
 import { Alert } from '@/components/ui/Alert';
 import { Button } from '@/components/ui/Button';
 import { PageHeader } from '@/components/ui/Card';
@@ -15,47 +16,16 @@ import { Dialog } from '@/components/ui/Dialog';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Pagination } from '@/components/ui/Pagination';
 import { SelectField } from '@/components/ui/SelectField';
-import { Spinner } from '@/components/ui/Spinner';
 import { TextField } from '@/components/ui/TextField';
 import { ApiError, errorMessage } from '@/lib/api-client';
 import { useAuth } from '@/lib/auth';
 import { formatMinutes, formatWorkDate, todayIn } from '@/lib/datetime';
 import { useDepartments } from '../employees/api';
-import { useKioskStatus } from '../kiosk/api';
 import { useOvertimeList, useOvertimeSummary, useSaveOvertimePolicy } from './api';
 import { OVERTIME_STATUS } from './labels';
 import { OvertimeDecisionDialog, OvertimeRecordCard } from './OvertimeRecordCard';
 
 const PAGE_SIZE = 20;
-
-function Loading() {
-  return (
-    <div className="flex justify-center py-12 text-brand-700">
-      <Spinner />
-    </div>
-  );
-}
-
-/** Company timezone (from the public kiosk status), so times and "today" match the office. */
-function WithCompanyTimezone({ children }: { children: (timezone: string) => ReactNode }) {
-  const company = useKioskStatus(null);
-  if (company.isError) return <Alert tone="error">{errorMessage(company.error)}</Alert>;
-  if (!company.data) return <Loading />;
-  return <>{children(company.data.timezone)}</>;
-}
-
-function useQueryState() {
-  const [params, setParams] = useSearchParams();
-  const update = (next: Record<string, string>) => {
-    const p = new URLSearchParams(params);
-    for (const [k, v] of Object.entries(next)) {
-      if (v) p.set(k, v);
-      else p.delete(k);
-    }
-    setParams(p, { replace: true });
-  };
-  return { params, update };
-}
 
 /** Department filter, shown only to people whose scope spans departments. */
 function DepartmentFilter({ value, onChange }: { value: string; onChange: (v: string) => void }) {

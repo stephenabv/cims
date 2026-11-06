@@ -39,6 +39,12 @@ describe('navigation', () => {
     );
     expect(labels([])).not.toContain('Overtime');
   });
+  it('shows pay screens only with payroll permissions', () => {
+    expect(labels(['payroll.compensation.view'])).toContain('Pay setup');
+    expect(labels(['payroll.compensation.view'])).not.toContain('Payroll settings');
+    expect(labels(['payroll.configure'])).toContain('Payroll settings');
+    expect(labels([])).not.toEqual(expect.arrayContaining(['Pay setup']));
+  });
   it('shows organisation admin only with org.manage', () => {
     expect(labels(['org.manage'])).toContain('Departments & positions');
   });

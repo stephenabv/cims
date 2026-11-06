@@ -86,7 +86,7 @@ export async function createTestApp(opts: { throttle?: boolean } = {}): Promise<
 export async function resetData(prisma: PrismaClient): Promise<void> {
   // Append-only triggers block DELETE on audit tables, so TRUNCATE (which bypasses row triggers) is used.
   await prisma.$executeRawUnsafe(
-    'TRUNCATE TABLE overtime_history, overtime_record, leave_request_day, leave_approval_step, leave_request, leave_balance, approval_chain_step, approval_chain, leave_type, attendance_conflict, sync_batch, attendance_day, attendance_event, kiosk_device, holiday, session, password_reset_token, mfa_recovery_code, auth_event, audit_log, employee_change_history, user_account, employee, position, department, company_setting RESTART IDENTITY CASCADE',
+    'TRUNCATE TABLE employee_pay_item, compensation_profile, pay_item_type, undertime_policy, overtime_history, overtime_record, leave_request_day, leave_approval_step, leave_request, leave_balance, approval_chain_step, approval_chain, leave_type, attendance_conflict, sync_batch, attendance_day, attendance_event, kiosk_device, holiday, session, password_reset_token, mfa_recovery_code, auth_event, audit_log, employee_change_history, user_account, employee, position, department, company_setting RESTART IDENTITY CASCADE',
   );
   // Keep seeded system roles and the default schedule; remove ones created by tests so suites stay order-independent.
   await prisma.role.deleteMany({ where: { isSystem: false } });
@@ -105,7 +105,26 @@ export async function resetData(prisma: PrismaClient): Promise<void> {
     ],
   });
   await ensureDefaultApprovalChain(prisma);
+  // Payroll defaults from the payroll_setup migration.
+  await prisma.undertimePolicy.create({
+    data: {
+      id: DEFAULT_UNDERTIME_POLICY_ID,
+      name: 'Hourly-rate equivalent',
+      kind: 'HOURLY_EQUIVALENT',
+      isDefault: true,
+    },
+  });
+  await prisma.payItemType.createMany({
+    data: [
+      { code: 'SSS', name: 'SSS contribution', direction: 'DEDUCTION' },
+      { code: 'PHIC', name: 'PhilHealth contribution', direction: 'DEDUCTION' },
+      { code: 'HDMF', name: 'Pag-IBIG contribution', direction: 'DEDUCTION' },
+      { code: 'WTAX', name: 'Withholding tax', direction: 'DEDUCTION' },
+    ],
+  });
 }
+
+export const DEFAULT_UNDERTIME_POLICY_ID = '00000000-0000-4000-8000-000000000131';
 
 async function seedAccessControl(prisma: PrismaClient): Promise<void> {
   for (const code of ALL_PERMISSION_CODES) {
@@ -249,6 +268,10 @@ export class Client {
 
   put(path: string, body?: object): Promise<request.Response> {
     return this.send('put', path, body);
+  }
+
+  del(path: string): Promise<request.Response> {
+    return this.send('delete', path);
   }
 
   async login(user: Pick<TestUser, 'accountNumber' | 'password'>): Promise<request.Response> {

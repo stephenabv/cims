@@ -14,6 +14,9 @@ import { ConflictsPage } from '@/features/attendance/ConflictsPage';
 import { LeaveApprovalsPage, LeaveRequestsPage, MyLeavePage } from '@/features/leave/LeavePages';
 import { LeaveSettingsPage } from '@/features/leave/LeaveSettingsPage';
 import { OvertimeApprovalsPage, OvertimeSummaryPage } from '@/features/overtime/OvertimePages';
+import { CompensationListPage } from '@/features/payroll/CompensationListPage';
+import { EmployeeCompensationPage } from '@/features/payroll/EmployeeCompensationPage';
+import { PayrollSettingsPage } from '@/features/payroll/PayrollSettingsPage';
 import { KioskDevicesPage } from '@/features/attendance/KioskDevicesPage';
 import { SchedulesPage } from '@/features/attendance/SchedulesPage';
 import { EmployeeDetailPage, MyProfilePage } from '@/features/employees/EmployeeDetailPage';
@@ -83,6 +86,9 @@ export function AppRoutes() {
         <Route path="leave/settings" element={<LeaveSettingsPage />} />
         <Route path="overtime" element={<OvertimeApprovalsPage />} />
         <Route path="overtime/summary" element={<OvertimeSummaryPage />} />
+        <Route path="payroll/employees" element={<CompensationListPage />} />
+        <Route path="payroll/employees/:id" element={<EmployeeCompensationPage />} />
+        <Route path="payroll/settings" element={<PayrollSettingsPage />} />
         <Route path="*" element={<NotFoundPage />} />
       </Route>
       <Route path="*" element={<NotFoundPage />} />
